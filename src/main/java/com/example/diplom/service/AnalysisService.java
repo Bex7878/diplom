@@ -34,6 +34,7 @@ public class AnalysisService {
             return Collections.emptyList();
         }
 
+        //something
         ExtractedItem[] items = response.getBody();
         if (items == null) {
             return Collections.emptyList();
