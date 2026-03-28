@@ -68,6 +68,10 @@ public class AnalysisService {
             BigDecimal marketPrice = indicatorOpt.map(MarketIndicator::getBaselinePrice)
                     .orElse(BigDecimal.valueOf(1000.00));
 
+            if (marketPrice.compareTo(BigDecimal.valueOf(0.01)) < 0) {
+                marketPrice = BigDecimal.valueOf(0.01);
+            }
+
             BigDecimal contractPrice = BigDecimal.valueOf(item.price());
             BigDecimal deviation = contractPrice.subtract(marketPrice)
                     .divide(marketPrice, 4, RoundingMode.HALF_UP)
