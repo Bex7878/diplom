@@ -6,6 +6,7 @@ import com.example.diplom.dto.RiskAssessment;
 import com.example.diplom.model.*;
 import com.example.diplom.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,8 +26,9 @@ public class AnalysisService {
     private final ExtractedItemRepository extractedItemRepository;
     private final MarketIndicatorRepository marketIndicatorRepository;
     private final BenchmarkLogRepository benchmarkLogRepository;
-    
-    private final String nlpServiceUrl = "http://localhost:8000/extract";
+
+    @Value("${NLP_SERVICE_URL:http://localhost:8000/extract}")
+    private String nlpServiceUrl;
 
     @Transactional
     public List<RiskAssessment> analyzeAndSaveContract(String contractText, String bin) {

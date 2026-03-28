@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: diplom_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - diplom-network
+
+  python-nlp:
+    build:
+      context: ./nlp-service
+    container_name: python-nlp
+    ports:
+      - "8000:8000"
+    networks:
+      - diplom-network
+
+  spring-backend:
+    build:
+      context: .
+    container_name: spring-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/diplom_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password123
+      NLP_SERVICE_URL: http://python-nlp:8000/extract
+    depends_on:
+      - postgres-db
+    networks:
+      - diplom-network
+
+  react-frontend:
+    build:
+      context: ./frontend
+    container_name: react-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8080
+    networks:
+      - diplom-network
+
+networks:
+  diplom-network:
+    driver: bridge
