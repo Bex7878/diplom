@@ -22,6 +22,7 @@ public class AnalysisService {
 
     private final RestTemplate restTemplate;
     private final ContractRepository contractRepository;
+    private final ExtractedItemRepository extractedItemRepository;
     private final MarketIndicatorRepository marketIndicatorRepository;
     private final BenchmarkLogRepository benchmarkLogRepository;
     
@@ -59,6 +60,7 @@ public class AnalysisService {
                     .unit(item.unit())
                     .price(BigDecimal.valueOf(item.price()))
                     .build();
+            itemEntity = extractedItemRepository.save(itemEntity);
             
             Optional<MarketIndicator> indicatorOpt = marketIndicatorRepository
                     .findFirstByItemNameIgnoreCaseOrderByTimestampDesc(item.itemName());

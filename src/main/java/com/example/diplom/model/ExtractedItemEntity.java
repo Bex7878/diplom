@@ -1,5 +1,6 @@
 package com.example.diplom.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -18,6 +19,7 @@ public class ExtractedItemEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id")
+    @JsonIgnore
     private Contract contract;
 
     @Column(name = "item_name", nullable = false)
