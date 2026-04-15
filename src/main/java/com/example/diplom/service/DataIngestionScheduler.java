@@ -17,7 +17,7 @@ public class DataIngestionScheduler {
     private final RestTemplate restTemplate;
     private final AnalysisService analysisService;
 
-    @Value("${PYTHON_BASE_URL}")
+    @Value("${PYTHON_BASE_URL:http://localhost:8000}")
     private String pythonBaseUrl;
 
     public DataIngestionScheduler(RestTemplate restTemplate, AnalysisService analysisService) {
