@@ -33,6 +33,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: password123
       NLP_SERVICE_URL: http://python-nlp:8000/extract
+      PYTHON_BASE_URL: http://python-nlp:8000
     depends_on:
       - postgres-db
     networks:

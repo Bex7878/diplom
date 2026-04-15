@@ -1,5 +1,7 @@
 import re
 import spacy
+import random
+from datetime import datetime
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
@@ -149,6 +151,44 @@ def extract_entities(request: ExtractionRequest):
 
     return extracted[:10]
 
+@app.get("/mock-api/goszakup/v3/contracts/recent")
+def get_recent_contracts():
+    """
+    Эмулятор API Портала Госзакупок Казахстана.
+    Возвращает список из 1-3 случайных спецификаций договоров.
+    """
+    templates = [
+        "Предметом договора является Бумага офисная А4, объем закупки: {qty} пачка. Стоимость составляет {price} KZT.",
+        "Сатып алынатын тауар: Ноутбук HP ProBook, саны {qty} дана. Бағасы {price} KZT.",
+        "Предметом договора является Принтер Canon, объем закупки: {qty} шт. Стоимость составляет {price} KZT.",
+        "Поставка Кресло офисное в количестве {qty} шт по цене {price} за единицу."
+    ]
+    
+    contracts = []
+    num_contracts = random.randint(1, 3)
+    
+    for i in range(num_contracts):
+        template = random.choice(templates)
+        qty = random.randint(1, 100)
+        # Примерные цены для реалистичности
+        if "Бумага" in template:
+            price = qty * random.randint(1800, 2500)
+        elif "Ноутбук" in template:
+            price = qty * random.randint(300000, 450000)
+        elif "Принтер" in template:
+            price = qty * random.randint(80000, 150000)
+        else:
+            price = qty * random.randint(25000, 50000)
+            
+        contracts.append({
+            "id": f"CONT-{random.randint(100000, 999999)}",
+            "contract_specification": template.format(qty=qty, price=price),
+            "supplier_bin": f"{random.randint(100000000000, 999999999999)}",
+            "publish_date": datetime.now().isoformat()
+        })
+        
+    return contracts
+
 @app.get("/mock-api/marketplace/search")
 def search_marketplace_price(q: str):
     """
@@ -177,7 +217,6 @@ def search_marketplace_price(q: str):
 
     # Добавляем случайный разброс цен от -5% до +5%,
     # чтобы цены каждый день были чуть-чуть разными, как в реальной жизни!
-    import random
     random_variance = random.uniform(0.95, 1.05)
     final_price = round(base_price * random_variance, 2)
 
