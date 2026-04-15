@@ -7,5 +7,9 @@ import java.util.Optional;
 
 @Repository
 public interface MarketIndicatorRepository extends JpaRepository<MarketIndicator, Long> {
-    Optional<MarketIndicator> findFirstByItemNameIgnoreCaseOrderByTimestampDesc(String itemName);
+    Optional<MarketIndicator> findFirstByItemNameRuIgnoreCaseOrderByTimestampDesc(String itemNameRu);
+
+    Optional<MarketIndicator> findFirstByItemNameKkIgnoreCaseOrderByTimestampDesc(String itemNameKk);
+
+    Optional<MarketIndicator> findFirstByItemNameEnIgnoreCaseOrderByTimestampDesc(String itemNameEn);
 }

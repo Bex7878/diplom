@@ -17,8 +17,14 @@ public class MarketIndicator {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "item_name", nullable = false)
-    private String itemName;
+    @Column(name = "item_name_ru")
+    private String itemNameRu;
+
+    @Column(name = "item_name_kk")
+    private String itemNameKk;
+
+    @Column(name = "item_name_en")
+    private String itemNameEn;
 
     @Column(name = "baseline_price", nullable = false)
     private BigDecimal baselinePrice;

@@ -30,6 +30,21 @@ public class AnalysisService {
     @Value("${NLP_SERVICE_URL:http://localhost:8000/extract}")
     private String nlpServiceUrl;
 
+    private Optional<MarketIndicator> findIndicatorByName(String name) {
+        if (name == null || name.isBlank()) return Optional.empty();
+
+        Optional<MarketIndicator> found;
+
+        found = marketIndicatorRepository.findFirstByItemNameRuIgnoreCaseOrderByTimestampDesc(name);
+        if (found.isPresent()) return found;
+        found = marketIndicatorRepository.findFirstByItemNameKkIgnoreCaseOrderByTimestampDesc(name);
+        if (found.isPresent())return found;
+        found = marketIndicatorRepository.findFirstByItemNameEnIgnoreCaseOrderByTimestampDesc(name);
+
+        return found;
+
+    }
+
     @Transactional
     public List<RiskAssessment> analyzeAndSaveContract(String contractText, String bin) {
         // 1. Извлечение данных через Python NLP сервис
@@ -63,9 +78,9 @@ public class AnalysisService {
                     .price(BigDecimal.valueOf(item.price()))
                     .build();
             itemEntity = extractedItemRepository.save(itemEntity);
-            
-            Optional<MarketIndicator> indicatorOpt = marketIndicatorRepository
-                    .findFirstByItemNameIgnoreCaseOrderByTimestampDesc(item.itemName());
+
+            // 3. Поиск рыночной цены: RU → KK → EN
+            Optional<MarketIndicator> indicatorOpt = findIndicatorByName(item.itemName());
 
             BigDecimal marketPrice = indicatorOpt.map(MarketIndicator::getBaselinePrice)
                     .orElse(BigDecimal.valueOf(1000.00));
@@ -74,6 +89,7 @@ public class AnalysisService {
                 marketPrice = BigDecimal.valueOf(0.01);
             }
 
+            // 4. Вычисление отклонения
             BigDecimal contractPrice = BigDecimal.valueOf(item.price());
             BigDecimal deviation = contractPrice.subtract(marketPrice)
                     .divide(marketPrice, 4, RoundingMode.HALF_UP)
@@ -81,13 +97,13 @@ public class AnalysisService {
 
             boolean isHighRisk = deviation.compareTo(BigDecimal.valueOf(20)) > 0;
 
+            // 5. Сохранение лога бенчмарка
             BenchmarkLog log = BenchmarkLog.builder()
                     .extractedItem(itemEntity)
                     .marketIndicator(indicatorOpt.orElse(null))
                     .deviationPercentage(deviation)
                     .similarityScore(BigDecimal.ONE)
                     .build();
-            
             benchmarkLogRepository.save(log);
 
             assessments.add(new RiskAssessment(item, marketPrice.doubleValue(), deviation.doubleValue(), isHighRisk));
@@ -106,10 +122,21 @@ public class AnalysisService {
     
     @Transactional
     public MarketIndicator updateMarketPrice(String itemName, double price) {
-        MarketIndicator indicator = MarketIndicator.builder()
-                .itemName(itemName)
-                .baselinePrice(BigDecimal.valueOf(price))
-                .build();
+        Optional<MarketIndicator> existingOpt = findIndicatorByName(itemName);
+
+        MarketIndicator indicator;
+        if (existingOpt.isPresent()) {
+            indicator = existingOpt.get();
+            indicator.setBaselinePrice(BigDecimal.valueOf(price));
+        } else {
+            indicator = MarketIndicator.builder()
+                    .itemNameRu(itemName)
+                    .itemNameKk(null)
+                    .itemNameEn(null)
+                    .baselinePrice(BigDecimal.valueOf(price))
+                    .build();
+        }
+
         return marketIndicatorRepository.save(indicator);
     }
 }
