@@ -15,16 +15,19 @@ public class DataIngestionScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(DataIngestionScheduler.class);
     private final RestTemplate restTemplate;
+    private final AnalysisService analysisService;
 
     @Value("${PYTHON_BASE_URL}")
     private String pythonBaseUrl;
 
-    public DataIngestionScheduler(RestTemplate restTemplate) {
+    public DataIngestionScheduler(RestTemplate restTemplate, AnalysisService analysisService) {
         this.restTemplate = restTemplate;
+        this.analysisService = analysisService;
     }
 
     /**
      * Task 1: Fetch data from the Mock Goszakup API every 60 seconds.
+     * Extracts entities using NLP and saves them to the database.
      */
     @Scheduled(fixedRate = 60000)
     public void ingestGoszakupContracts() {
@@ -37,11 +40,16 @@ public class DataIngestionScheduler {
             if (contracts != null) {
                 logger.info("Received {} contracts from Goszakup Mock API", contracts.size());
                 for (Map<String, Object> contract : contracts) {
-                    logger.info("Contract ID: {}, Specification: {}", contract.get("id"), contract.get("contract_specification"));
+                    String spec = (String) contract.get("contract_specification");
+                    String bin = (String) contract.get("supplier_bin");
                     
-                    // TODO: Implement NLP extraction logic calling python-nlp:8000/extract
-                    // TODO: Save extracted items to the database using ExtractedItemRepository
+                    logger.info("Ingesting contract {} (BIN: {}). Specification: {}", 
+                            contract.get("id"), bin, spec);
+                    
+                    // Call AnalysisService to perform NLP extraction and save everything to DB
+                    analysisService.analyzeAndSaveContract(spec, bin);
                 }
+                logger.info("Successfully processed and saved {} contracts.", contracts.size());
             }
         } catch (Exception e) {
             logger.error("Error during Goszakup data ingestion: {}", e.getMessage());
@@ -50,6 +58,7 @@ public class DataIngestionScheduler {
 
     /**
      * Task 2: Fetch market prices from the Mock Marketplace API every 120 seconds.
+     * Updates market_indicators table with latest prices.
      */
     @Scheduled(fixedRate = 120000)
     public void ingestMarketplacePrices() {
@@ -63,16 +72,25 @@ public class DataIngestionScheduler {
                 if (response != null && response.containsKey("data")) {
                     List<Map<String, Object>> dataList = (List<Map<String, Object>>) response.get("data");
                     if (!dataList.isEmpty()) {
-                        Double price = (Double) dataList.get(0).get("average_market_price");
-                        logger.info("Market price for '{}': {} KZT (Source: {})", 
+                        Object priceObj = dataList.get(0).get("average_market_price");
+                        double price;
+                        if (priceObj instanceof Integer) {
+                            price = ((Integer) priceObj).doubleValue();
+                        } else {
+                            price = (Double) priceObj;
+                        }
+                        
+                        logger.info("Updating market price for '{}': {} KZT (Source: {})", 
                                 keyword, price, response.get("source"));
                         
-                        // TODO: Update market_indicators table with the latest price for the keyword
+                        // Update market_indicators table using AnalysisService
+                        analysisService.updateMarketPrice(keyword, price);
                     }
                 }
             } catch (Exception e) {
                 logger.error("Error fetching market price for '{}': {}", keyword, e.getMessage());
             }
         }
+        logger.info("Marketplace price ingestion completed.");
     }
 }
