@@ -1,21 +1,36 @@
 import React, {useState} from 'react';
+import { useAuth } from './AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const SpotCheck = () => {
     const [text, setText] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const { currentUser, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            navigate('/login');
+        } catch (err) {
+            console.error('Failed to log out', err);
+        }
+    };
 
     const handleAnalyze = async () => {
         setLoading(true);
         setError(null);
         try {
+            const token = await currentUser.getIdToken();
             // Используем переменную окружения VITE_API_URL для динамического подключения
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
             const response = await fetch(`${apiUrl}/api/analysis/spot-check`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({text}),
             });
@@ -36,6 +51,17 @@ const SpotCheck = () => {
     return (
         <div className="min-h-screen bg-gray-50 py-10 px-4 font-sans">
             <div className="max-w-4xl mx-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="text-sm text-gray-600">
+                        Logged in as: <span className="font-semibold">{currentUser?.email}</span>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 py-1 px-3 rounded transition-colors"
+                    >
+                        Logout
+                    </button>
+                </div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
                     Intelligent NLP Contract Spot-Check
                 </h1>
