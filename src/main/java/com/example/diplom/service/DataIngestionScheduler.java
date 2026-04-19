@@ -72,7 +72,7 @@ public class DataIngestionScheduler {
                 if (response != null && response.containsKey("data")) {
                     List<Map<String, Object>> dataList = (List<Map<String, Object>>) response.get("data");
                     if (!dataList.isEmpty()) {
-                        Object priceObj = dataList.get(0).get("average_market_price");
+                        Object priceObj = dataList.getFirst().get("average_market_price");
                         double price;
                         if (priceObj instanceof Integer) {
                             price = ((Integer) priceObj).doubleValue();
@@ -92,5 +92,34 @@ public class DataIngestionScheduler {
             }
         }
         logger.info("Marketplace price ingestion completed.");
+    }
+
+    /**
+     * Task 3: Trigger the Goszakup Scraper every 5 minutes.
+     * Fetches real lot data from the Python Scraper service.
+     */
+    @Scheduled(fixedRate = 300000) // 5 minutes
+    public void runGoszakupScraper() {
+        logger.info("Starting Goszakup Scraper...");
+        String url = pythonBaseUrl + "/api/scrape";
+        
+        try {
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            if (response != null && "success".equals(response.get("status"))) {
+                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                if (data != null) {
+                    logger.info("Scraper found {} lots. Saving to database...", data.size());
+                    for (Map<String, Object> lot : data) {
+                        analysisService.saveParsedLot(lot);
+                    }
+                    logger.info("Scraper results saved successfully.");
+                }
+            } else {
+                logger.warn("Scraper returned non-success status: {}", 
+                        response != null ? response.get("status") : "null");
+            }
+        } catch (Exception e) {
+            logger.error("Error running Goszakup Scraper: {}", e.getMessage());
+        }
     }
 }

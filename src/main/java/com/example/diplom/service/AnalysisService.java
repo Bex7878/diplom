@@ -26,6 +26,7 @@ public class AnalysisService {
     private final ExtractedItemRepository extractedItemRepository;
     private final MarketIndicatorRepository marketIndicatorRepository;
     private final BenchmarkLogRepository benchmarkLogRepository;
+    private final ParsedLotRepository parsedLotRepository;
 
     @Value("${NLP_SERVICE_URL:http://localhost:8000/extract}")
     private String nlpServiceUrl;
@@ -138,5 +139,38 @@ public class AnalysisService {
         }
 
         return marketIndicatorRepository.save(indicator);
+    }
+
+    @Transactional
+    public void saveParsedLot(Map<String, Object> lotData) {
+        String lotId = (String) lotData.get("lot_id");
+        if (lotId == null || parsedLotRepository.existsByLotId(lotId)) {
+            return;
+        }
+
+        ParsedLot lot = ParsedLot.builder()
+                .lotId(lotId)
+                .customerBin((String) lotData.get("customer_bin"))
+                .truName((String) lotData.get("tru_name"))
+                .description((String) lotData.get("description"))
+                .unitPrice(toBigDecimal(lotData.get("unit_price")))
+                .unit((String) lotData.get("unit"))
+                .quantity(toBigDecimal(lotData.get("quantity")))
+                .totalSum(toBigDecimal(lotData.get("total_sum")))
+                .build();
+
+        parsedLotRepository.save(lot);
+    }
+
+    private BigDecimal toBigDecimal(Object val) {
+        if (val == null) return BigDecimal.ZERO;
+        if (val instanceof Number) {
+            return BigDecimal.valueOf(((Number) val).doubleValue());
+        }
+        try {
+            return new BigDecimal(val.toString());
+        } catch (Exception e) {
+            return BigDecimal.ZERO;
+        }
     }
 }
