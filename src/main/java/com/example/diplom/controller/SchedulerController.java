@@ -16,17 +16,17 @@ public class SchedulerController {
 
     private final DataIngestionScheduler scheduler;
 
-    @PostMapping("/ingest-contracts")
-    public ResponseEntity<?> triggerIngestContracts() {
-        scheduler.ingestGoszakupContracts();
-        return ResponseEntity.ok(Map.of("message", "Goszakup contracts ingestion triggered successfully"));
-    }
-
-    @PostMapping("/ingest-prices")
-    public ResponseEntity<?> triggerIngestPrices() {
-        scheduler.ingestMarketplacePrices();
-        return ResponseEntity.ok(Map.of("message", "Marketplace prices ingestion triggered successfully"));
-    }
+//    @PostMapping("/ingest-contracts")
+//    public ResponseEntity<?> triggerIngestContracts() {
+//        scheduler.ingestGoszakupContracts();
+//        return ResponseEntity.ok(Map.of("message", "Goszakup contracts ingestion triggered successfully"));
+//    }
+//
+//    @PostMapping("/ingest-prices")
+//    public ResponseEntity<?> triggerIngestPrices() {
+//        scheduler.ingestMarketplacePrices();
+//        return ResponseEntity.ok(Map.of("message", "Marketplace prices ingestion triggered successfully"));
+//    }
 
     @PostMapping("/run-scraper")
     public ResponseEntity<?> triggerRunScraper() {

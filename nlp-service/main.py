@@ -7,11 +7,15 @@ from pydantic import BaseModel
 from typing import List
 import uvicorn
 import logging
+from fastapi import FastAPI
+from scraper import router as scraper_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="NLP Contract Extraction Service for Kazakhstan")
+
+app.include_router(scraper_router)
 
 try:
     nlp = spacy.load("ru_core_news_sm")
