@@ -40,7 +40,7 @@ const SpotCheck = () => {
 
     const handleLogout = () => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-        fetch(`${apiUrl}/logout`, { method: 'POST', credentials: 'include' })
+        fetch(`${apiUrl}/api/auth/logout`, { method: 'POST', credentials: 'include' })
             .finally(() => window.location.href = '/login');
     };
 

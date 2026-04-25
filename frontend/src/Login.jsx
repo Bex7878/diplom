@@ -13,7 +13,7 @@ const Login = () => {
         setError('');
         try {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-            const response = await axios.post(`${apiUrl}/login`, 
+            const response = await axios.post(`${apiUrl}/api/auth/login`, 
                 `username=${username}&password=${password}`, 
                 {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
