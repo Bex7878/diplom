@@ -10,7 +10,6 @@ const SpotCheck = () => {
         setLoading(true);
         setError(null);
         try {
-            // Используем переменную окружения VITE_API_URL для динамического подключения
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
             const response = await fetch(`${apiUrl}/api/analysis/spot-check`, {
                 method: 'POST',
@@ -18,7 +17,13 @@ const SpotCheck = () => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({text}),
+                credentials: 'include', // Important for sessions
             });
+
+            if (response.status === 401 || response.status === 403) {
+                window.location.href = '/login';
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -33,12 +38,26 @@ const SpotCheck = () => {
         }
     };
 
+    const handleLogout = () => {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+        fetch(`${apiUrl}/logout`, { method: 'POST', credentials: 'include' })
+            .finally(() => window.location.href = '/login');
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 py-10 px-4 font-sans">
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-                    Intelligent NLP Contract Spot-Check
-                </h1>
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-3xl font-bold text-gray-800">
+                        Intelligent NLP Contract Spot-Check
+                    </h1>
+                    <button 
+                        onClick={handleLogout}
+                        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                        Logout
+                    </button>
+                </div>
 
                 {/* Input Section */}
                 <div className="bg-white rounded-lg shadow-md p-6 mb-8">

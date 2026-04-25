@@ -49,3 +49,11 @@ CREATE TABLE parsed_lots (
     total_sum NUMERIC(15, 2),            -- Запланированная сумма
     parsed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Время парсинга
 );
+
+-- User table for authentication and authorization
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL
+);
