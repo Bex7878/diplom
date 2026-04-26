@@ -83,7 +83,7 @@ class AnalysisControllerIT {
     void testSpotCheckWithRisk() throws Exception {
         // 1. Prepare market data
         marketIndicatorRepository.save(MarketIndicator.builder()
-                .itemName("Laptop")
+                .itemNameEn("Laptop")
                 .baselinePrice(BigDecimal.valueOf(1000.0))
                 .build());
 
@@ -139,7 +139,7 @@ class AnalysisControllerIT {
     void testGetRisks() throws Exception {
         // 1. Prepare market data (low price)
         marketIndicatorRepository.save(MarketIndicator.builder()
-                .itemName("Mouse")
+                .itemNameEn("Mouse")
                 .baselinePrice(BigDecimal.valueOf(10.0))
                 .build());
 

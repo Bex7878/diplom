@@ -22,6 +22,9 @@ const Login = () => {
             );
             
             if (response.status === 200) {
+                const data = response.data;
+                localStorage.setItem('userRole', data.role);
+                localStorage.setItem('username', data.username);
                 navigate('/');
             }
         } catch (err) {

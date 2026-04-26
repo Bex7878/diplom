@@ -3,12 +3,24 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import SpotCheck from './SpotCheck';
 import Login from './Login';
 import Register from './Register';
+import LotSearch from './LotSearch';
+import Layout from './Layout';
+import AdminPanel from './AdminPanel';
 
 // A simple protected route component
-const ProtectedRoute = ({ children }) => {
-    // In a real app, you'd check for a session cookie or a token in localStorage/context
-    // For now, we'll assume the backend handles session validation on API calls
-    return children;
+const ProtectedRoute = ({ children, adminOnly = false }) => {
+    const userRole = localStorage.getItem('userRole');
+    
+    // In a real app, you'd also verify the session with the backend
+    if (!userRole) {
+        return <Navigate to="/login" />;
+    }
+
+    if (adminOnly && userRole !== 'ROLE_ADMIN') {
+        return <Navigate to="/" />;
+    }
+
+    return <Layout>{children}</Layout>;
 };
 
 function App() {
@@ -22,6 +34,22 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <SpotCheck />
+                        </ProtectedRoute>
+                    } 
+                />
+                <Route 
+                    path="/lots" 
+                    element={
+                        <ProtectedRoute>
+                            <LotSearch />
+                        </ProtectedRoute>
+                    } 
+                />
+                <Route 
+                    path="/admin" 
+                    element={
+                        <ProtectedRoute adminOnly={true}>
+                            <AdminPanel />
                         </ProtectedRoute>
                     } 
                 />

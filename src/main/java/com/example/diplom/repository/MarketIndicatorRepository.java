@@ -12,4 +12,8 @@ public interface MarketIndicatorRepository extends JpaRepository<MarketIndicator
     Optional<MarketIndicator> findFirstByItemNameKkIgnoreCaseOrderByTimestampDesc(String itemNameKk);
 
     Optional<MarketIndicator> findFirstByItemNameEnIgnoreCaseOrderByTimestampDesc(String itemNameEn);
+
+    Optional<MarketIndicator> findFirstByItemNameRuOrderByTimestampDesc(String name);
+    Optional<MarketIndicator> findFirstByItemNameKkOrderByTimestampDesc(String name);
+    Optional<MarketIndicator> findFirstByItemNameEnOrderByTimestampDesc(String name);
 }

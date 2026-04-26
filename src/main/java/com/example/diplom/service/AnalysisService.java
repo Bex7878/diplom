@@ -21,6 +21,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AnalysisService {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AnalysisService.class);
     private final RestTemplate restTemplate;
     private final ContractRepository contractRepository;
     private final ExtractedItemRepository extractedItemRepository;
@@ -31,19 +32,79 @@ public class AnalysisService {
     @Value("${NLP_SERVICE_URL:http://localhost:8000/extract}")
     private String nlpServiceUrl;
 
+    @Value("${PYTHON_BASE_URL:http://localhost:8000}")
+    private String pythonBaseUrl;
+
+    @Transactional
+    public Map<String, Object> triggerScraper(String sessionCookie) {
+        String url = pythonBaseUrl + "/api/scrape";
+        if (sessionCookie != null && !sessionCookie.isBlank()) {
+            url += "?session_cookie=" + sessionCookie;
+        }
+
+        try {
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            if (response != null && "success".equals(response.get("status"))) {
+                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                if (data != null) {
+                    logger.info("Scraper found {} lots. Saving to database...", data.size());
+                    for (Map<String, Object> lot : data) {
+                        try {
+                            saveParsedLot(lot);
+                        } catch (Exception e) {
+                            logger.error("Не удалось сохранить лот: " + lot.get("lot_id") + ". Ошибка: " + e.getMessage());
+                        }
+                    }
+                    return Map.of("status", "success", "count", data.size());
+                }
+            }
+            return Map.of("status", "error", "message", "Scraper returned non-success status");
+        } catch (Exception e) {
+            logger.error("Error running Goszakup Scraper: {}", e.getMessage());
+            return Map.of("status", "error", "message", e.getMessage());
+        }
+    }
+
     private Optional<MarketIndicator> findIndicatorByName(String name) {
         if (name == null || name.isBlank()) return Optional.empty();
 
+        String cleanName = name.trim().toLowerCase();
+
         Optional<MarketIndicator> found;
 
-        found = marketIndicatorRepository.findFirstByItemNameRuIgnoreCaseOrderByTimestampDesc(name);
+        found = marketIndicatorRepository.findFirstByItemNameRuOrderByTimestampDesc(cleanName);
         if (found.isPresent()) return found;
-        found = marketIndicatorRepository.findFirstByItemNameKkIgnoreCaseOrderByTimestampDesc(name);
-        if (found.isPresent())return found;
-        found = marketIndicatorRepository.findFirstByItemNameEnIgnoreCaseOrderByTimestampDesc(name);
+
+        found = marketIndicatorRepository.findFirstByItemNameKkOrderByTimestampDesc(cleanName);
+        if (found.isPresent()) return found;
+
+        found = marketIndicatorRepository.findFirstByItemNameEnOrderByTimestampDesc(cleanName);
 
         return found;
+    }
 
+    private BigDecimal calculateAverageMarketPrice(String itemName) {
+        if (itemName == null || itemName.isBlank()) {
+            return BigDecimal.valueOf(1000.00);
+        }
+
+        List<ParsedLot> historicalLots = parsedLotRepository.findByTruNameContainingIgnoreCase(itemName.trim());
+
+        if (historicalLots.isEmpty()) {
+            return BigDecimal.valueOf(1000.00);
+        }
+
+        List<BigDecimal> prices = historicalLots.stream()
+                .map(ParsedLot::getUnitPrice)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (prices.isEmpty()) {
+            return BigDecimal.valueOf(1000.00);
+        }
+
+        BigDecimal sum = prices.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        return sum.divide(BigDecimal.valueOf(prices.size()), 2, RoundingMode.HALF_UP);
     }
 
     @Transactional
@@ -80,11 +141,8 @@ public class AnalysisService {
                     .build();
             itemEntity = extractedItemRepository.save(itemEntity);
 
-            // 3. Поиск рыночной цены: RU → KK → EN
-            Optional<MarketIndicator> indicatorOpt = findIndicatorByName(item.itemName());
-
-            BigDecimal marketPrice = indicatorOpt.map(MarketIndicator::getBaselinePrice)
-                    .orElse(BigDecimal.valueOf(1000.00));
+            // 3. Поиск рыночной цены по историческим данным ParsedLot
+            BigDecimal marketPrice = calculateAverageMarketPrice(item.itemName());
 
             if (marketPrice.compareTo(BigDecimal.valueOf(0.01)) < 0) {
                 marketPrice = BigDecimal.valueOf(0.01);
@@ -101,7 +159,7 @@ public class AnalysisService {
             // 5. Сохранение лога бенчмарка
             BenchmarkLog log = BenchmarkLog.builder()
                     .extractedItem(itemEntity)
-                    .marketIndicator(indicatorOpt.orElse(null))
+                    .marketIndicator(null)
                     .deviationPercentage(deviation)
                     .similarityScore(BigDecimal.ONE)
                     .build();
@@ -131,7 +189,7 @@ public class AnalysisService {
             indicator.setBaselinePrice(BigDecimal.valueOf(price));
         } else {
             indicator = MarketIndicator.builder()
-                    .itemNameRu(itemName)
+                    .itemNameRu(itemName != null ? itemName.trim().toLowerCase() : null)
                     .itemNameKk(null)
                     .itemNameEn(null)
                     .baselinePrice(BigDecimal.valueOf(price))

@@ -17,7 +17,7 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     # Вставь сюда свой очищенный куки:
-    "Cookie": "ci_session=XjUAOgYxB2gOIVQlWzZWZ1RnDToACQAlXSYDMV17ACEJYgU6BTsDUF49Cm5TDFIlUzwDcgNuUmRTZFViBg8DJghkV2QBMAcwCWhQN1NhDWBeZgAxBmQHZg4%2FVDNbPFYzVDENNwBlADJdZwNmXTAAZAk9BWUFYgM%2FXmQKP1MyUj5TNAM2A2xSYVNmVW8GYwM9CDFXOAE3B2wJPlBjU2cNOV5kADkGNgdrDjhUMFs6VjVUNA1lAGMAZF1gA2FdPAAxCVcFdwVuA3xebgo7U2BSPVNbAyMDPVIiUw9VOQY3A2AIcldlAScHJglXUCJTOA1yXm4AMQYxB2gOBlR0Wz1WZlRuDS4AZwA0XWwDel08AGIJJQVnBWYDP14ICihTa1J0Uz0DMANkUmhTDFV6BiYDdwhlV3IBCwc0CWxQZVNtDXVeCAAiBj4HIQ5gVGdbPVZnVG0NXAB3AEpdOgMuXWEAPglnBTQFegM6XnoKOlNwUi9TUANoAzpSNlM%2FVS8GIAMkCE5XVAF0B2QJO1AuUzMNOl50AFcGbAc8DmxUYls3VnZULw02AGEALl11AxVdeAAiCWcFMAUCA2peNgpBUzlSc1MoAzQDZ1JlU35VawZlAyQIKFdLARwHAQlGUExTLw0hXjgAaQZuBzcOelQRW2lWNVQ8DW8AfAAnXRYDPF16AD0JZgUwBXoDPl5gCj1TflI3UykDMQN6UmJTcFULBjIDYghhV3IBPQd6CT5QM1M0DS9eZwA2BlkHcA5hVCVbNlZnVGQNOgAJACVdOQM1XXsAJglUBTQFNgN7Xj0KfFM5UnNTfgNdA3ZSaVM5VWIGYgMzCDdXNgFiB2UJMlA2UzANNF5vAH0%3D"
+    "Cookie": "ci_session=WTIAOlBnBWoFKlMiVThbalBjUmULAlJ3DnVXZQAmVHVUP1RrU20GVQ1uD2sAXwF2AW5XJlY7UmRUYwUyCgNVcABqVGJdaVNlV2UCZwczVjtZagBkUDEFZgVhU2lVN1tpUGVSOwtqUmcOY1c1ADZUZ1QyVDNTNwY5DTIPbgA0ATcBZldtVjlSa1QzBW0Kb1ViADhUNF0%2FUzhXbQJnB2BWbVlrADZQYAVjBWdTZlUyWz1QNVI6CztSZA4wVzYAbFQ0VApUJlM4BnkNPQ8%2BADMBbgEJV3dWaFIiVAgFaQo7VTYAelRmXXtTclcJAnAHbFYpWWkAMVBnBWoFDVNzVTNba1BqUnELbFJmDj9XLgBhVDZUeFQ2UzAGOg1bDy0AOAEnAW9XZFYxUmhUCwUqCipVIQBtVHFdV1NgVzICNwc5Vi5ZDwAiUGgFIwVrU2BVM1tqUGlSAwt8UhgOaVd6ADxUalQ6VGVTLAY%2FDSkPPwAjAXwBAlc8Vm9SNlQ4BX8KLFVyAEZUV10oUzBXZQJ8B2dWYVlzAFdQOgU%2BBWdTZVU5W3tQK1JpC2pSfA4mV0EAJVR2VDpUYVNUBm8NZQ9EAGoBIAF6V2BWMlJlVHkFOwppVXIAIFRIXUBTVVcYAh4He1Z6WT8AaVA4BTUFcVMWVWdbOFA4UjALd1J1DkVXaAAnVGlUO1RhUywGOw0zDzgALQFkAXtXZVYvUmJUdwVbCj5VNABpVHFdYVMuV2ACYQdgVnRZYAA2UA8FcgVqUyJVOFtqUGBSZQsCUncOaldhACZUclQJVGVTYAZ%2BDW4PeQBqASABLFcJViNSaVQ%2BBTIKblVlAD9UNF06UzFXZwJmB2VWb1loAH0%3D"
 }
 
 def clean_number(text: str) -> float:
@@ -80,12 +80,20 @@ def parse_lot_page(html_content: str):
     }
 
 @router.get("/api/scrape")
-def scrape_goszakup():
+def scrape_goszakup(session_cookie: str = None):
     print(f"⏳ [Scraper] Запускаю парсер через единую сессию (Session)...")
 
     # 💡 СОЗДАЕМ СЕССИЮ: Теперь мы работаем как настоящий браузер!
     session = requests.Session()
-    session.headers.update(HEADERS)
+    
+    current_headers = HEADERS.copy()
+    if session_cookie:
+        current_headers["Cookie"] = session_cookie
+        print("🔑 Использую переданный Cookie")
+    else:
+        print("⚠️ Использую встроенный Cookie (может быть просрочен)")
+        
+    session.headers.update(current_headers)
 
     try:
         search_response = session.get(SEARCH_URL, timeout=15)

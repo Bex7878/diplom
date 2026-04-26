@@ -100,29 +100,7 @@ public class DataIngestionScheduler {
      */
     @Scheduled(fixedRate = 300000) // 5 minutes
     public void runGoszakupScraper() {
-        logger.info("Starting Goszakup Scraper...");
-        String url = pythonBaseUrl + "/api/scrape";
-        
-        try {
-            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
-            if (response != null && "success".equals(response.get("status"))) {
-                List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                if (data != null) {
-                    logger.info("Scraper found {} lots. Saving to database...", data.size());
-                    for (Map<String, Object> lot : data) {
-                        try {
-                            analysisService.saveParsedLot(lot);
-                        } catch (Exception e) {
-                            logger.error("Не удалось сохранить лот: " + lot.get("lot_id") + ". Ошибка: " + e.getMessage());
-                        }
-                    }
-                }
-            } else {
-                logger.warn("Scraper returned non-success status: {}", 
-                        response != null ? response.get("status") : "null");
-            }
-        } catch (Exception e) {
-            logger.error("Error running Goszakup Scraper: {}", e.getMessage());
-        }
+        logger.info("Starting scheduled Goszakup Scraper...");
+        analysisService.triggerScraper(null);
     }
 }

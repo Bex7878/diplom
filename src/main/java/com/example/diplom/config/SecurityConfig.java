@@ -42,7 +42,10 @@ public class SecurityConfig {
                         .loginProcessingUrl("/api/auth/login")
                         .successHandler((request, response, authentication) -> {
                             response.setStatus(200);
-                            response.getWriter().write("{\"message\": \"Logged in successfully\"}");
+                            response.setContentType("application/json");
+                            String username = authentication.getName();
+                            String role = authentication.getAuthorities().iterator().next().getAuthority();
+                            response.getWriter().write(String.format("{\"message\": \"Logged in successfully\", \"username\": \"%s\", \"role\": \"%s\"}", username, role));
                         })
                         .failureHandler((request, response, exception) -> {
                             response.setStatus(401);
