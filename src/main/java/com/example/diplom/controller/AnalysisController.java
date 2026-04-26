@@ -25,7 +25,7 @@ public class AnalysisController {
     @PostMapping("/spot-check")
     public List<RiskAssessment> spotCheck(@RequestBody AnalysisRequest request, 
                                           @RequestParam(defaultValue = "000000000000") String bin) {
-        return analysisService.analyzeAndSaveContract(request.text(), bin);
+        return analysisService.analyzeAndSaveContract(request.text(), bin, request.threshold());
     }
 
     // Получить историю всех проверенных контрактов
@@ -36,8 +36,8 @@ public class AnalysisController {
 
     // Получить только рискованные операции
     @GetMapping("/risks")
-    public List<BenchmarkLog> getRisks() {
-        return analysisService.getHighRiskOperations();
+    public List<BenchmarkLog> getRisks(@RequestParam(required = false) Double threshold) {
+        return analysisService.getHighRiskOperations(threshold);
     }
 
     // Обновить или добавить рыночную цену для товара

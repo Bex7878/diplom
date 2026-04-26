@@ -108,18 +108,21 @@ public class AnalysisService {
     }
 
     @Transactional
-    public List<RiskAssessment> analyzeAndSaveContract(String contractText, String bin) {
+    public List<RiskAssessment> analyzeAndSaveContract(String contractText, String bin, Double threshold) {
         // 1. Извлечение данных через Python NLP сервис
-        AnalysisRequest request = new AnalysisRequest(contractText);
+        AnalysisRequest nlpRequest = new AnalysisRequest(contractText);
         ResponseEntity<ExtractedItem[]> response;
         try {
-            response = restTemplate.postForEntity(nlpServiceUrl, request, ExtractedItem[].class);
+            response = restTemplate.postForEntity(nlpServiceUrl, nlpRequest, ExtractedItem[].class);
         } catch (Exception e) {
             throw new RuntimeException("NLP service unavailable: " + e.getMessage());
         }
 
         ExtractedItem[] items = response.getBody();
         if (items == null) return Collections.emptyList();
+
+        // Порог риска по умолчанию
+        BigDecimal riskThreshold = (threshold != null) ? BigDecimal.valueOf(threshold) : BigDecimal.valueOf(20);
 
         // 2. Создание и сохранение записи о контракте
         Contract contract = Contract.builder()
@@ -154,7 +157,7 @@ public class AnalysisService {
                     .divide(marketPrice, 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100));
 
-            boolean isHighRisk = deviation.compareTo(BigDecimal.valueOf(20)) > 0;
+            boolean isHighRisk = deviation.compareTo(riskThreshold) > 0;
 
             // 5. Сохранение лога бенчмарка
             BenchmarkLog log = BenchmarkLog.builder()
@@ -175,8 +178,9 @@ public class AnalysisService {
         return contractRepository.findAll();
     }
 
-    public List<BenchmarkLog> getHighRiskOperations() {
-        return benchmarkLogRepository.findByDeviationPercentageGreaterThan(BigDecimal.valueOf(20));
+    public List<BenchmarkLog> getHighRiskOperations(Double threshold) {
+        BigDecimal riskThreshold = (threshold != null) ? BigDecimal.valueOf(threshold) : BigDecimal.valueOf(20);
+        return benchmarkLogRepository.findByDeviationPercentageGreaterThan(riskThreshold);
     }
     
     @Transactional

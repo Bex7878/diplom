@@ -5,20 +5,32 @@ const SpotCheck = () => {
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [threshold, setThreshold] = useState(localStorage.getItem('userRiskThreshold') || '20');
+
+    const handleThresholdChange = (e) => {
+        const value = e.target.value;
+        setThreshold(value);
+        localStorage.setItem('userRiskThreshold', value);
+    };
 
     const handleAnalyze = async () => {
         setLoading(true);
         setError(null);
         try {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+            
             const response = await fetch(`${apiUrl}/api/analysis/spot-check`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({ 
+                    text: text,
+                    threshold: parseFloat(threshold)
+                }),
                 credentials: 'include',
             });
+
 
             if (response.status === 401 || response.status === 403) {
                 window.location.href = '/login';
@@ -44,6 +56,30 @@ const SpotCheck = () => {
                 <h1 className="text-3xl font-bold text-gray-800">Contract Spot-Check</h1>
                 <p className="text-gray-600 italic">Analyze contract specifications for price deviations using NLP</p>
             </header>
+
+            {/* Sensitivity Settings */}
+            <div className="bg-blue-50/50 rounded-xl border border-blue-100 p-4 mb-6">
+                <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-bold text-blue-800 flex items-center">
+                        <span className="mr-2">⚙️</span> Analysis Sensitivity:
+                    </label>
+                    <span className="px-2 py-0.5 bg-blue-600 text-white text-xs font-black rounded-md">
+                        {threshold}% Deviation
+                    </span>
+                </div>
+                <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={threshold}
+                    onChange={handleThresholdChange}
+                    className="w-full h-1.5 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[10px] text-blue-400 mt-1 uppercase font-bold tracking-tighter">
+                    <span>Strict (1%)</span>
+                    <span>Lenient (100%)</span>
+                </div>
+            </div>
 
             {/* Input Section */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 transition-all hover:shadow-md">
