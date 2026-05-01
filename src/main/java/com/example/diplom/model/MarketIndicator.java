@@ -1,5 +1,6 @@
 package com.example.diplom.model;
 
+import com.example.diplom.enums.MarketSource;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -32,6 +33,7 @@ public class MarketIndicator {
     @Column(name = "timestamp", insertable = false, updatable = false)
     private LocalDateTime timestamp;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "source")
-    private String source;
+    private MarketSource source;
 }

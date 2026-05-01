@@ -1,15 +1,31 @@
 import React, { useState, useEffect } from 'react';
 
+const MARKET_SOURCES = [
+    { value: 'IMPORT',  label: 'File Import (общий импорт)' },
+    { value: 'MANUAL',  label: 'Manual (ручной ввод)' },
+    { value: 'KASPI',   label: 'Kaspi Market' },
+    { value: 'AMAZON',  label: 'Amazon Market' },
+    { value: 'API',     label: 'External API' },
+    { value: 'SYSTEM',  label: 'System Generated' },
+];
+
 const AdminPanel = () => {
     const [cookie, setCookie] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
     const [threshold, setThreshold] = useState(localStorage.getItem('userRiskThreshold') || '20');
-    
+
     // User management state
     const [users, setUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
+
+    // Excel import state
+    const [excelFile, setExcelFile] = useState(null);
+    const [excelSource, setExcelSource] = useState('IMPORT');
+    const [excelLoading, setExcelLoading] = useState(false);
+    const [excelResult, setExcelResult] = useState(null);
+    const [excelError, setExcelError] = useState(null);
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -100,6 +116,34 @@ const AdminPanel = () => {
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleExcelImport = async (e) => {
+        e.preventDefault();
+        if (!excelFile) { setExcelError('Выберите файл'); return; }
+        setExcelLoading(true);
+        setExcelError(null);
+        setExcelResult(null);
+        try {
+            const formData = new FormData();
+            formData.append('file', excelFile);
+            formData.append('source', excelSource);
+            const response = await fetch(`${apiUrl}/api/admin/import-excel`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include',
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || `Ошибка сервера: ${response.status}`);
+            }
+            const data = await response.json();
+            setExcelResult(data);
+        } catch (err) {
+            setExcelError(err.message);
+        } finally {
+            setExcelLoading(false);
         }
     };
 
@@ -204,7 +248,133 @@ const AdminPanel = () => {
                 </div>
             </div>
 
-            {/* 3. Scraper Trigger */}
+            {/* 3. Excel Import */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                    <h2 className="text-xl font-semibold text-gray-800 flex items-center">
+                        <span className="mr-2">📊</span> Импорт Market Indicators из Excel
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Загрузите .xlsx или .xls файл с данными о рыночных ценах. Ожидаемые колонки:
+                        <span className="ml-1 font-mono text-xs bg-gray-100 px-1 rounded">наименование / name</span>,{' '}
+                        <span className="font-mono text-xs bg-gray-100 px-1 rounded">цена / price</span>.
+                        Поддерживаются RU/KK/EN варианты.
+                    </p>
+                </div>
+                <div className="p-6">
+                    <form onSubmit={handleExcelImport} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Excel файл <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="file"
+                                    accept=".xlsx,.xls"
+                                    onChange={(e) => { setExcelFile(e.target.files[0]); setExcelResult(null); setExcelError(null); }}
+                                    className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-gray-300 rounded-lg p-2"
+                                />
+                                {excelFile && (
+                                    <p className="text-xs text-gray-500 mt-1">{excelFile.name} — {(excelFile.size / 1024).toFixed(1)} KB</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Источник данных (MarketSource)
+                                </label>
+                                <select
+                                    value={excelSource}
+                                    onChange={(e) => setExcelSource(e.target.value)}
+                                    className="w-full p-2.5 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    {MARKET_SOURCES.map(s => (
+                                        <option key={s.value} value={s.value}>{s.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={excelLoading || !excelFile}
+                            className={`w-full py-3 px-4 rounded-lg font-bold text-white shadow-lg transition-all ${
+                                excelLoading || !excelFile
+                                    ? 'bg-green-300 cursor-not-allowed'
+                                    : 'bg-green-600 hover:bg-green-700 active:transform active:scale-[0.98] shadow-green-500/20'
+                            }`}
+                        >
+                            {excelLoading ? 'Импортируем данные...' : '📥 Загрузить и импортировать'}
+                        </button>
+                    </form>
+
+                    {excelError && (
+                        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                            <p className="font-bold">Ошибка импорта</p>
+                            <p>{excelError}</p>
+                        </div>
+                    )}
+
+                    {excelResult && (
+                        <div className="mt-4 space-y-3">
+                            <div className={`p-4 rounded-lg border text-sm ${
+                                excelResult.skipped === 0
+                                    ? 'bg-green-50 border-green-200 text-green-800'
+                                    : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                            }`}>
+                                <p className="font-bold mb-1">
+                                    {excelResult.skipped === 0 ? 'Импорт завершён успешно' : 'Импорт завершён с предупреждениями'}
+                                </p>
+                                <div className="flex gap-4">
+                                    <span>Всего строк: <strong>{excelResult.total}</strong></span>
+                                    <span className="text-green-700">Сохранено: <strong>{excelResult.saved}</strong></span>
+                                    {excelResult.skipped > 0 && (
+                                        <span className="text-yellow-700">Пропущено: <strong>{excelResult.skipped}</strong></span>
+                                    )}
+                                </div>
+                            </div>
+                            {excelResult.errors && excelResult.errors.length > 0 && (
+                                <details className="text-xs">
+                                    <summary className="cursor-pointer text-gray-500 hover:text-gray-700 font-medium">
+                                        Показать предупреждения ({excelResult.errors.length})
+                                    </summary>
+                                    <ul className="mt-2 space-y-1 bg-gray-50 rounded p-3 max-h-40 overflow-y-auto">
+                                        {excelResult.errors.map((err, i) => (
+                                            <li key={i} className="text-yellow-700">{err}</li>
+                                        ))}
+                                    </ul>
+                                </details>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Expected format hint */}
+                <div className="px-6 pb-6">
+                    <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-600">
+                        <p className="font-semibold mb-2 text-gray-700">Поддерживаемые форматы заголовков колонок:</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div>
+                                <span className="font-medium">Наименование (RU):</span>{' '}
+                                наименование, название_ру, item_name_ru, name_ru
+                            </div>
+                            <div>
+                                <span className="font-medium">Наименование (KK):</span>{' '}
+                                атауы, наименование_қаз, item_name_kk, name_kk
+                            </div>
+                            <div>
+                                <span className="font-medium">Наименование (EN):</span>{' '}
+                                name, product, item_name_en, name_en
+                            </div>
+                            <div>
+                                <span className="font-medium">Цена:</span>{' '}
+                                цена, стоимость, price, baseline_price, unit_price
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 4. Scraper Trigger */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6 border-b border-gray-100 bg-gray-50/50">
                     <h2 className="text-xl font-semibold text-gray-800 flex items-center">

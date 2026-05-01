@@ -197,6 +197,7 @@ public class AnalysisService {
                     .itemNameKk(null)
                     .itemNameEn(null)
                     .baselinePrice(BigDecimal.valueOf(price))
+                    .source(com.example.diplom.enums.MarketSource.MANUAL)
                     .build();
         }
 

@@ -24,7 +24,8 @@ CREATE TABLE market_indicators (
     item_name_kk VARCHAR(255),
     item_name_en VARCHAR(255),
     baseline_price NUMERIC NOT NULL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    source VARCHAR(255)
 );
 
 -- Logs the results of benchmarking extracted items against market indicators
