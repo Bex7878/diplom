@@ -31,4 +31,7 @@ public class MarketIndicator {
 
     @Column(name = "timestamp", insertable = false, updatable = false)
     private LocalDateTime timestamp;
+
+    @Column(name = "source")
+    private String source;
 }
