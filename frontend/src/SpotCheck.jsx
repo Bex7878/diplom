@@ -1,6 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+).toString();
 
 const SpotCheck = () => {
     const [mode, setMode] = useState('text'); // 'text' | 'lot'
@@ -20,7 +27,9 @@ const SpotCheck = () => {
 
     const textResultsRef = useRef(null);
     const lotResultRef = useRef(null);
+    const fileInputRef = useRef(null);
     const [draftSaved, setDraftSaved] = useState(false);
+    const [fileStatus, setFileStatus] = useState({ state: 'idle', name: '' });
 
     // Load draft on mount
     useEffect(() => {
@@ -135,11 +144,58 @@ const SpotCheck = () => {
         }
     };
 
+    const parseFile = async (file) => {
+        const isPdf = file.type === 'application/pdf';
+        const isDocx = file.name.endsWith('.docx') ||
+            file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+        if (!isPdf && !isDocx) {
+            setFileStatus({ state: 'error', name: file.name, msg: 'Only PDF and DOCX files are supported.' });
+            return;
+        }
+
+        setFileStatus({ state: 'parsing', name: file.name });
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            let extracted = '';
+
+            if (isPdf) {
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    extracted += content.items.map(item => item.str).join(' ') + '\n';
+                }
+            } else {
+                const result = await mammoth.extractRawText({ arrayBuffer });
+                extracted = result.value;
+            }
+
+            setText(extracted.trim());
+            setFileStatus({ state: 'done', name: file.name });
+        } catch {
+            setFileStatus({ state: 'error', name: file.name, msg: 'Failed to parse file. Try copying the text manually.' });
+        }
+    };
+
+    const handleFileDrop = (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (file) parseFile(file);
+    };
+
+    const handleFileInput = (e) => {
+        const file = e.target.files[0];
+        if (file) parseFile(file);
+        e.target.value = '';
+    };
+
     const handleModeSwitch = (newMode) => {
         setMode(newMode);
         setError(null);
         setResults([]);
         setLotResult(null);
+        setFileStatus({ state: 'idle', name: '' });
     };
 
     return (
@@ -201,8 +257,66 @@ const SpotCheck = () => {
             {mode === 'text' && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 transition-all hover:shadow-md">
                     <label className="block text-gray-700 font-bold mb-3 flex items-center">
-                        <span className="mr-2 text-blue-500">📄</span> Paste Contract Text:
+                        <span className="mr-2 text-blue-500">📄</span> Contract Text:
                     </label>
+
+                    {/* File upload zone */}
+                    <div
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={handleFileDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="cursor-pointer border-2 border-dashed border-blue-200 hover:border-blue-400 bg-blue-50/40 hover:bg-blue-50 rounded-lg px-4 py-5 mb-3 flex items-center gap-4 transition-all select-none"
+                    >
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            onChange={handleFileInput}
+                            className="hidden"
+                        />
+                        <span className="text-2xl">
+                            {fileStatus.state === 'parsing' ? '⏳' :
+                             fileStatus.state === 'done'    ? '✅' :
+                             fileStatus.state === 'error'   ? '❌' : '📎'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                            {fileStatus.state === 'idle' && (
+                                <>
+                                    <p className="text-sm font-bold text-blue-700">Drop PDF or DOCX here, or click to browse</p>
+                                    <p className="text-xs text-blue-400 mt-0.5">Text will be extracted and placed in the field below</p>
+                                </>
+                            )}
+                            {fileStatus.state === 'parsing' && (
+                                <p className="text-sm font-bold text-blue-600 animate-pulse">Parsing {fileStatus.name}…</p>
+                            )}
+                            {fileStatus.state === 'done' && (
+                                <>
+                                    <p className="text-sm font-bold text-green-700 truncate">{fileStatus.name}</p>
+                                    <p className="text-xs text-green-500 mt-0.5">Text extracted — review below before analyzing</p>
+                                </>
+                            )}
+                            {fileStatus.state === 'error' && (
+                                <>
+                                    <p className="text-sm font-bold text-red-600 truncate">{fileStatus.name}</p>
+                                    <p className="text-xs text-red-400 mt-0.5">{fileStatus.msg}</p>
+                                </>
+                            )}
+                        </div>
+                        {fileStatus.state !== 'idle' && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setFileStatus({ state: 'idle', name: '' }); }}
+                                className="text-gray-300 hover:text-gray-500 text-lg leading-none"
+                                title="Clear"
+                            >×</button>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="flex-1 h-px bg-gray-100" />
+                        <span className="text-xs text-gray-400 font-medium">or type manually</span>
+                        <div className="flex-1 h-px bg-gray-100" />
+                    </div>
+
                     <textarea
                         className="w-full h-48 p-4 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none"
                         placeholder="Example: Предметом договора является Бумага офисная А4, объем закупки: 50 пачка. Стоимость составляет 2500 KZT за единицу..."
