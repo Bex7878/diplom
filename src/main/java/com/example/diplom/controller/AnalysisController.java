@@ -1,14 +1,17 @@
 package com.example.diplom.controller;
 
 import com.example.diplom.dto.AnalysisRequest;
+import com.example.diplom.dto.LotAnalysisResult;
 import com.example.diplom.dto.RiskAssessment;
 import com.example.diplom.model.BenchmarkLog;
 import com.example.diplom.model.Contract;
 import com.example.diplom.model.MarketIndicator;
 import com.example.diplom.service.AnalysisService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/analysis")
@@ -38,6 +41,19 @@ public class AnalysisController {
     @GetMapping("/risks")
     public List<BenchmarkLog> getRisks(@RequestParam(required = false) Double threshold) {
         return analysisService.getHighRiskOperations(threshold);
+    }
+
+    // Анализ лота из parsed_lots по lot_id с сравнением с market_indicators
+    @GetMapping("/analyze-lot")
+    public ResponseEntity<?> analyzeLot(
+            @RequestParam String lotId,
+            @RequestParam(required = false) Double threshold) {
+        try {
+            LotAnalysisResult result = analysisService.analyzeByLotId(lotId, threshold);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     // Обновить или добавить рыночную цену для товара

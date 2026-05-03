@@ -1,8 +1,6 @@
 package com.example.diplom.service;
 
-import com.example.diplom.dto.AnalysisRequest;
-import com.example.diplom.dto.ExtractedItem;
-import com.example.diplom.dto.RiskAssessment;
+import com.example.diplom.dto.*;
 import com.example.diplom.model.*;
 import com.example.diplom.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -67,20 +65,37 @@ public class AnalysisService {
 
     private Optional<MarketIndicator> findIndicatorByName(String name) {
         if (name == null || name.isBlank()) return Optional.empty();
-
         String cleanName = name.trim().toLowerCase();
-
         Optional<MarketIndicator> found;
-
         found = marketIndicatorRepository.findFirstByItemNameRuOrderByTimestampDesc(cleanName);
         if (found.isPresent()) return found;
-
         found = marketIndicatorRepository.findFirstByItemNameKkOrderByTimestampDesc(cleanName);
         if (found.isPresent()) return found;
+        return marketIndicatorRepository.findFirstByItemNameEnOrderByTimestampDesc(cleanName);
+    }
 
-        found = marketIndicatorRepository.findFirstByItemNameEnOrderByTimestampDesc(cleanName);
+    private List<MarketIndicator> findAllIndicators(String name) {
+        if (name == null || name.isBlank()) return List.of();
+        String cleanName = name.trim().toLowerCase();
+        List<MarketIndicator> exact = marketIndicatorRepository.findAllByExactName(cleanName);
+        if (!exact.isEmpty()) return exact;
+        return marketIndicatorRepository.findMatchingByNameContainedIn(cleanName);
+    }
 
-        return found;
+    private List<MarketComparison> buildComparisons(
+            List<MarketIndicator> indicators, BigDecimal contractPrice, BigDecimal riskThreshold) {
+        return indicators.stream().map(ind -> {
+            BigDecimal mp = ind.getBaselinePrice();
+            BigDecimal dev = contractPrice.subtract(mp)
+                    .divide(mp, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100));
+            return new MarketComparison(
+                    mp.doubleValue(),
+                    ind.getSource() != null ? ind.getSource().name() : "UNKNOWN",
+                    dev.doubleValue(),
+                    dev.compareTo(riskThreshold) > 0
+            );
+        }).toList();
     }
 
     private BigDecimal calculateAverageMarketPrice(String itemName) {
@@ -144,15 +159,28 @@ public class AnalysisService {
                     .build();
             itemEntity = extractedItemRepository.save(itemEntity);
 
-            // 3. Поиск рыночной цены по историческим данным ParsedLot
-            BigDecimal marketPrice = calculateAverageMarketPrice(item.itemName());
+            // 3. Поиск всех подходящих market_indicators, иначе историческое среднее
+            List<MarketIndicator> indicators = findAllIndicators(item.itemName());
+            BigDecimal contractPrice = BigDecimal.valueOf(item.price());
+            BigDecimal marketPrice;
+            String marketSource;
+            List<MarketComparison> allComparisons;
+
+            if (!indicators.isEmpty()) {
+                marketPrice = indicators.get(0).getBaselinePrice();
+                marketSource = "market_indicator";
+                allComparisons = buildComparisons(indicators, contractPrice, riskThreshold);
+            } else {
+                marketPrice = calculateAverageMarketPrice(item.itemName());
+                marketSource = "historical_average";
+                allComparisons = List.of();
+            }
 
             if (marketPrice.compareTo(BigDecimal.valueOf(0.01)) < 0) {
                 marketPrice = BigDecimal.valueOf(0.01);
             }
 
-            // 4. Вычисление отклонения
-            BigDecimal contractPrice = BigDecimal.valueOf(item.price());
+            // 4. Вычисление отклонения по основной цене
             BigDecimal deviation = contractPrice.subtract(marketPrice)
                     .divide(marketPrice, 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100));
@@ -168,10 +196,63 @@ public class AnalysisService {
                     .build();
             benchmarkLogRepository.save(log);
 
-            assessments.add(new RiskAssessment(item, marketPrice.doubleValue(), deviation.doubleValue(), isHighRisk));
+            assessments.add(new RiskAssessment(item, marketPrice.doubleValue(), marketSource, deviation.doubleValue(), isHighRisk, allComparisons));
         }
 
         return assessments;
+    }
+
+    @Transactional(readOnly = true)
+    public LotAnalysisResult analyzeByLotId(String lotId, Double threshold) {
+        ParsedLot lot = parsedLotRepository.findByLotId(lotId)
+                .orElseThrow(() -> new RuntimeException("Лот не найден: " + lotId));
+
+        BigDecimal riskThreshold = threshold != null
+                ? BigDecimal.valueOf(threshold)
+                : BigDecimal.valueOf(20);
+
+        // 1. Найти все подходящие market_indicators
+        List<MarketIndicator> indicators = findAllIndicators(lot.getTruName());
+
+        BigDecimal lotPrice = lot.getUnitPrice() != null ? lot.getUnitPrice() : BigDecimal.ZERO;
+        BigDecimal marketPrice;
+        String marketSource;
+        List<MarketComparison> allComparisons;
+
+        if (!indicators.isEmpty()) {
+            marketPrice = indicators.get(0).getBaselinePrice();
+            marketSource = "market_indicator";
+            allComparisons = buildComparisons(indicators, lotPrice, riskThreshold);
+        } else {
+            marketPrice = calculateAverageMarketPrice(lot.getTruName());
+            marketSource = "historical_average";
+            allComparisons = List.of();
+        }
+
+        if (marketPrice.compareTo(BigDecimal.valueOf(0.01)) < 0) {
+            marketPrice = BigDecimal.valueOf(0.01);
+        }
+
+        BigDecimal deviation = lotPrice.subtract(marketPrice)
+                .divide(marketPrice, 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100));
+
+        boolean isHighRisk = deviation.compareTo(riskThreshold) > 0;
+
+        return new LotAnalysisResult(
+                lot.getLotId(),
+                lot.getTruName(),
+                lot.getCustomerBin(),
+                lotPrice,
+                lot.getQuantity(),
+                lot.getUnit(),
+                lot.getTotalSum(),
+                marketPrice.doubleValue(),
+                marketSource,
+                deviation.doubleValue(),
+                isHighRisk,
+                allComparisons
+        );
     }
 
     public List<Contract> getAllContracts() {
