@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -20,6 +20,27 @@ const SpotCheck = () => {
 
     const textResultsRef = useRef(null);
     const lotResultRef = useRef(null);
+    const [draftSaved, setDraftSaved] = useState(false);
+
+    // Load draft on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('spotcheck_draft');
+        if (saved) setText(saved);
+    }, []);
+
+    // Auto-save draft with debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (text.trim()) {
+                localStorage.setItem('spotcheck_draft', text);
+                setDraftSaved(true);
+                setTimeout(() => setDraftSaved(false), 2000);
+            } else {
+                localStorage.removeItem('spotcheck_draft');
+            }
+        }, 600);
+        return () => clearTimeout(timer);
+    }, [text]);
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -188,6 +209,19 @@ const SpotCheck = () => {
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                     />
+                    <div className="flex items-center justify-between mt-1.5 min-h-[20px]">
+                        <span className={`text-xs text-green-600 font-medium transition-opacity duration-300 ${draftSaved ? 'opacity-100' : 'opacity-0'}`}>
+                            ✓ Draft saved
+                        </span>
+                        {text && (
+                            <button
+                                onClick={() => { setText(''); localStorage.removeItem('spotcheck_draft'); }}
+                                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                                Clear draft
+                            </button>
+                        )}
+                    </div>
                     <button
                         onClick={handleAnalyzeText}
                         disabled={loading || !text}
