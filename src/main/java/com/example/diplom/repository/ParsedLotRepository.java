@@ -1,6 +1,8 @@
 package com.example.diplom.repository;
 
 import com.example.diplom.model.ParsedLot;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,5 +22,5 @@ public interface ParsedLotRepository extends JpaRepository<ParsedLot, Long> {
            "LOWER(p.lotId) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.customerBin) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(p.truName) LIKE LOWER(CONCAT('%', :query, '%'))")
-    List<ParsedLot> searchLots(@Param("query") String query);
+    Page<ParsedLot> searchLots(@Param("query") String query, Pageable pageable);
 }
