@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const SpotCheck = () => {
     const [mode, setMode] = useState('text'); // 'text' | 'lot'
@@ -14,6 +16,10 @@ const SpotCheck = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [threshold, setThreshold] = useState(localStorage.getItem('userRiskThreshold') || '20');
+    const [exporting, setExporting] = useState(false);
+
+    const textResultsRef = useRef(null);
+    const lotResultRef = useRef(null);
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -74,6 +80,37 @@ const SpotCheck = () => {
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleExportPdf = async (ref, filename) => {
+        if (!ref.current) return;
+        setExporting(true);
+        try {
+            const canvas = await html2canvas(ref.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const scaledHeight = (canvas.height * pageWidth) / canvas.width;
+
+            let heightLeft = scaledHeight;
+            let position = 0;
+            pdf.addImage(imgData, 'PNG', 0, position, pageWidth, scaledHeight);
+            heightLeft -= pageHeight;
+            while (heightLeft > 0) {
+                position -= pageHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, pageWidth, scaledHeight);
+                heightLeft -= pageHeight;
+            }
+            pdf.save(filename);
+        } finally {
+            setExporting(false);
         }
     };
 
@@ -208,19 +245,43 @@ const SpotCheck = () => {
 
             {/* ── LOT RESULT ── */}
             {lotResult && (
-                <LotResultCard result={lotResult} threshold={parseFloat(threshold)} />
+                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-800">Analysis Result</h2>
+                        <button
+                            onClick={() => handleExportPdf(lotResultRef, `lot-${lotResult.lotId || 'result'}.pdf`)}
+                            disabled={exporting}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-bold rounded-lg shadow transition-all active:scale-95"
+                        >
+                            {exporting ? <LoadingSpinner label="Exporting..." /> : '⬇️ Export PDF'}
+                        </button>
+                    </div>
+                    <div ref={lotResultRef}>
+                        <LotResultCard result={lotResult} threshold={parseFloat(threshold)} />
+                    </div>
+                </div>
             )}
 
             {/* ── TEXT RESULTS ── */}
             {results.length > 0 && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="flex items-center justify-between border-b border-gray-200 pb-2">
-                        <h2 className="text-2xl font-bold text-gray-800">Analysis Results</h2>
-                        <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                            {results.length} item(s) found
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-2xl font-bold text-gray-800">Analysis Results</h2>
+                            <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                                {results.length} item(s) found
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => handleExportPdf(textResultsRef, 'text-analysis-results.pdf')}
+                            disabled={exporting}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-bold rounded-lg shadow transition-all active:scale-95"
+                        >
+                            {exporting ? <LoadingSpinner label="Exporting..." /> : '⬇️ Export PDF'}
+                        </button>
                     </div>
 
+                    <div ref={textResultsRef} className="space-y-6">
                     {results.map((result, index) => {
                         const isHighRisk = result.isHighRisk;
                         const sourceLabel = result.marketSource === 'market_indicator'
@@ -260,6 +321,7 @@ const SpotCheck = () => {
                             </div>
                         );
                     })}
+                    </div>
                 </div>
             )}
 
