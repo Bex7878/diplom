@@ -1,35 +1,46 @@
+import os
 import re
-import spacy
 import random
+import logging
 from datetime import datetime
+from typing import List
+
+import spacy
+import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import List
-import uvicorn
-import logging
-from fastapi import FastAPI
+
+from normalizer import clean_number, normalize_unit, normalize_item
 from scraper import router as scraper_router
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="NLP Contract Extraction Service for Kazakhstan")
-
+app = FastAPI(title="NLP Contract Extraction Service — Kazakhstan")
 app.include_router(scraper_router)
 
-try:
-    nlp = spacy.load("ru_core_news_sm")
-    logger.info("Loaded Russian spaCy model (ru_core_news_sm)")
-except Exception as e:
-    logger.warning(f"Failed to load Russian model: {e}. Attempting to download...")
-    try:
-        import subprocess
-        subprocess.run(["python", "-m", "spacy", "download", "ru_core_news_sm"], check=True)
-        nlp = spacy.load("ru_core_news_sm")
-    except Exception as e2:
-        logger.error(f"Could not load or download Russian model: {e2}. Falling back to blank model.")
-        nlp = spacy.blank("ru")
+# ── Model loading ────────────────────────────────────────────────────────────
+MODEL_PATH = "./ner_model"
+USE_TRAINED = False
 
+if os.path.exists(MODEL_PATH):
+    try:
+        nlp = spacy.load(MODEL_PATH)
+        USE_TRAINED = True
+        logger.info("Loaded trained NER model from ./ner_model")
+    except Exception as e:
+        logger.error(f"Failed to load trained model: {e}. Falling back to ru_core_news_sm.")
+
+if not USE_TRAINED:
+    try:
+        nlp = spacy.load("ru_core_news_sm")
+        logger.warning("Using ru_core_news_sm WITHOUT custom training — run train_ner.py first.")
+    except Exception:
+        nlp = spacy.blank("ru")
+        logger.error("Could not load any Russian model. Using blank model.")
+
+
+# ── Pydantic models ──────────────────────────────────────────────────────────
 class ExtractionRequest(BaseModel):
     text: str
 
@@ -39,204 +50,210 @@ class ExtractedEntity(BaseModel):
     unit: str
     price: float
 
-# Очищает числовые строки от пробелов и нормализует разделители для приведения к float
-def clean_number(text: str) -> float:
-    cleaned = re.sub(r'\s+', '', text).replace(',', '.')
-    if cleaned.count('.') > 1:
-        parts = cleaned.split('.')
-        cleaned = "".join(parts[:-1]) + "." + parts[-1]
-    try:
-        return float(cleaned)
-    except ValueError:
-        return 0.0
 
-# Выполняет лемматизацию (приведение к начальной форме) названия товара с помощью spaCy
-def normalize_item_name(name: str) -> str:
-    doc = nlp(name.lower())
-    lemmatized = " ".join([token.lemma_ for token in doc if not token.is_punct])
-    return lemmatized.strip()
+# ── Primary: trained NER extraction ─────────────────────────────────────────
+def extract_with_trained_ner(text: str) -> List[ExtractedEntity]:
+    """
+    Use the trained NER model to detect ITEM / QTY / UNIT / PRICE entities.
+    Works directly with doc.ents (no doc.sents) so it doesn't require a
+    sentence-boundary component in the pipeline.
+    Entities are matched positionally in order of appearance.
+    """
+    doc = nlp(text)
 
-# Извлекает данные о товарах с помощью улучшенных регулярных выражений
+    # Sort all recognised entities by their start position in the text
+    all_ents = sorted(doc.ents, key=lambda e: e.start)
+
+    items  = [e for e in all_ents if e.label_ == "ITEM"]
+    qtys   = [e for e in all_ents if e.label_ == "QTY"]
+    units  = [e for e in all_ents if e.label_ == "UNIT"]
+    prices = [e for e in all_ents if e.label_ == "PRICE"]
+
+    if not items or not prices:
+        return []
+
+    results = []
+    for i, item_ent in enumerate(items):
+        qty_text   = qtys[i].text   if i < len(qtys)   else "1"
+        unit_text  = units[i].text  if i < len(units)  else "шт"
+        price_text = prices[i].text if i < len(prices) else None
+
+        if price_text is None:
+            continue
+
+        qty_val   = clean_number(qty_text)
+        price_val = clean_number(price_text)
+        if price_val <= 0:
+            continue
+
+        results.append(ExtractedEntity(
+            item_name=normalize_item(item_ent.text, nlp),
+            qty=qty_val if qty_val > 0 else 1.0,
+            unit=normalize_unit(unit_text),
+            price=price_val,
+        ))
+
+    return results
+
+
+# ── Fallback: regex extraction ───────────────────────────────────────────────
 def find_items_regex(text: str) -> List[ExtractedEntity]:
+    """
+    Multi-pattern regex extraction covering structured and narrative formats
+    in both Russian and Kazakh procurement language.
+    """
     items = []
-    # Добавили 'пачка', 'пачек', 'дана' в словарь измерений
-    units_pattern = r'(шт|ед|кг|м|л|пар|уп|компл|штук|единиц|пачка|пачек|дана)'
+    units_pat = r"(шт|штук|ед\.|ед|кг|г|м|л|мл|пар|уп\.|упак\.|компл\.|компл|пачка|пачек|дана)"
 
-    # 1. Умный паттерн для сложных предложений (покрывает наш датасет)
-    # Ищет "объем закупки: ... пачка" и "Стоимость составляет ..."
-    dataset_pattern = r'(.+?),\s*(?:объем закупки|саны)[:\s]*(\d+[\s\d]*[.,]?\d*)\s*' + units_pattern + r'.*?(?:составляет|бағасы)\s*(\d+[\s\d]*[.,]?\d*)'
-    dataset_matches = re.findall(dataset_pattern, text, re.IGNORECASE)
-    for match in dataset_matches:
-        name, qty_str, unit, price_str = match
-        # Очищаем название от лишних вводных слов
-        name = name.replace("Предметом договора является", "").replace("Сатып алынатын тауар:", "").strip()
-        norm_name = normalize_item_name(name)
+    # Pattern 1 — "объем закупки / саны: N unit … составляет / бағасы PRICE"
+    pat1 = (
+        r"(.+?),\s*(?:объем закупки|саны)[:\s]*"
+        r"(\d[\d\s]*[.,]?\d*)\s*" + units_pat +
+        r".*?(?:составляет|бағасы)\s*(\d[\d\s]*[.,]?\d*)"
+    )
+    for m in re.finditer(pat1, text, re.IGNORECASE | re.DOTALL):
+        name, qty_s, unit, price_s = m.group(1), m.group(2), m.group(3), m.group(4)
+        name = re.sub(r"(?i)предметом\s+договора\s+является|сатып\s+алынатын\s+тауар:", "", name).strip()
         items.append(ExtractedEntity(
-            item_name=norm_name if len(norm_name) > 2 else name,
-            qty=clean_number(qty_str),
-            unit=unit.strip().lower(),
-            price=clean_number(price_str)
+            item_name=normalize_item(name, nlp),
+            qty=clean_number(qty_s),
+            unit=normalize_unit(unit),
+            price=clean_number(price_s),
         ))
-        return items # Если нашли сложный паттерн, сразу возвращаем результат
+    if items:
+        return items
 
-    # 2. Старый табличный паттерн (Товар 100 шт 3200)
-    rows = re.findall(r'(.+?)\s+(\d+[\s\d]*[.,]?\d*)\s+' + units_pattern + r'\.?\s+(\d+[\s\d]*[.,]?\d*)', text, re.IGNORECASE)
-    for match in rows:
-        name, qty_str, unit, price_str = match
-        norm_name = normalize_item_name(name.strip())
-        items.append(ExtractedEntity(
-            item_name=norm_name if len(norm_name) > 2 else name.strip(),
-            qty=clean_number(qty_str),
-            unit=unit.strip().lower(),
-            price=clean_number(price_str)
-        ))
+    # Pattern 2 — "в количестве N unit по цене PRICE"
+    pat2 = (
+        r"([\w\s\"\'«»\-]+?)\s+в\s+количестве\s+"
+        r"(\d[\d\s]*[.,]?\d*)\s*" + units_pat +
+        r"[.,]?\s+по\s+цене\s+(\d[\d\s]*[.,]?\d*)"
+    )
+    for m in re.finditer(pat2, text, re.IGNORECASE):
+        name, qty_s, unit, price_s = m.group(1), m.group(2), m.group(3), m.group(4)
+        norm = normalize_item(name.strip(), nlp)
+        if len(norm) > 3:
+            items.append(ExtractedEntity(
+                item_name=norm,
+                qty=clean_number(qty_s),
+                unit=normalize_unit(unit),
+                price=clean_number(price_s),
+            ))
+    if items:
+        return items
 
-    # 3. Старый текстовый паттерн (в количестве 100 шт по цене 3200)
-    narrative_pattern = r'([\w\s\"\'«»-]+?)\s+в\s+количестве\s+(\d+[\s\d]*[.,]?\d*)\s+' + units_pattern + r'\.?\s+по\s+цене\s+(\d+[\s\d]*[.,]?\d*)'
-    narrative_matches = re.findall(narrative_pattern, text, re.IGNORECASE)
-    for match in narrative_matches:
-        name, qty_str, unit, price_str = match
-        norm_name = normalize_item_name(name.strip())
-        if len(norm_name) > 3:
-             items.append(ExtractedEntity(
-                item_name=norm_name,
-                qty=clean_number(qty_str),
-                unit=unit.strip().lower(),
-                price=clean_number(price_str)
+    # Pattern 3 — tabular: "NAME   QTY   UNIT   PRICE"
+    pat3 = r"(.+?)\s+(\d[\d\s]*[.,]?\d*)\s*" + units_pat + r"\.?\s+(\d[\d\s]*[.,]?\d*)"
+    for m in re.finditer(pat3, text, re.IGNORECASE):
+        name, qty_s, unit, price_s = m.group(1), m.group(2), m.group(3), m.group(4)
+        norm = normalize_item(name.strip(), nlp)
+        if len(norm) > 2:
+            items.append(ExtractedEntity(
+                item_name=norm,
+                qty=clean_number(qty_s),
+                unit=normalize_unit(unit),
+                price=clean_number(price_s),
             ))
 
     return items
 
-# Использует NLP (POS-теги и синтаксический анализ) для поиска товаров и цен в неструктурированном тексте
-def extract_with_nlp(text: str) -> List[ExtractedEntity]:
+
+# ── Heuristic NLP fallback (original, kept as last resort) ──────────────────
+def extract_with_heuristics(text: str) -> List[ExtractedEntity]:
     doc = nlp(text)
     items = []
     for sent in doc.sents:
         sent_text = sent.text.lower()
-        if any(kw in sent_text for kw in ["количество", "цена", "стоимость", "шт", "тг", "тенге"]):
-            potential_item_parts = []
-            for token in sent:
-                if token.pos_ in ["NOUN", "PROPN", "ADJ"]:
-                    potential_item_parts.append(token.text)
-                elif potential_item_parts and token.pos_ == "PUNCT":
-                    break
-                elif potential_item_parts and token.text in ["в", "на", "по", "количество", "цена"]:
-                    break
-            if potential_item_parts:
-                product_name = normalize_item_name(" ".join(potential_item_parts))
-                nums = re.findall(r'(\d+[\s\d]*[.,]?\d*)', sent_text)
-                if len(nums) >= 2:
-                    items.append(ExtractedEntity(
-                        item_name=product_name,
-                        qty=clean_number(nums[0]),
-                        unit="шт",
-                        price=clean_number(nums[1])
-                    ))
+        if not any(kw in sent_text for kw in ["количество", "цена", "стоимость", "шт", "тг", "тенге", "бағасы"]):
+            continue
+        name_parts = []
+        for token in sent:
+            if token.pos_ in ("NOUN", "PROPN", "ADJ"):
+                name_parts.append(token.text)
+            elif name_parts and token.pos_ == "PUNCT":
+                break
+            elif name_parts and token.text in ("в", "на", "по", "количество", "цена"):
+                break
+        if not name_parts:
+            continue
+        nums = re.findall(r"(\d[\d\s]*[.,]?\d*)", sent_text)
+        if len(nums) >= 2:
+            items.append(ExtractedEntity(
+                item_name=normalize_item(" ".join(name_parts), nlp),
+                qty=clean_number(nums[0]),
+                unit="шт",
+                price=clean_number(nums[1]),
+            ))
     return items
 
-# Основной эндпоинт, объединяющий регулярные выражения и NLP-эвристики для извлечения сущностей
+
+# ── Main endpoint ────────────────────────────────────────────────────────────
 @app.post("/extract", response_model=List[ExtractedEntity])
 def extract_entities(request: ExtractionRequest):
     text = request.text
-    if not text:
+    if not text or not text.strip():
         return []
 
-    extracted = find_items_regex(text)
-    if not extracted:
-        extracted = extract_with_nlp(text)
-    
-    if not extracted:
-        if "Dell" in text:
-             extracted = [ExtractedEntity(item_name="ноутбук dell latitude 5520", qty=1, unit="шт", price=450000)]
-        else:
-             nums = re.findall(r'(\d+[\s\d]*[.,]?\d*)', text)
-             if len(nums) >= 2:
-                 extracted = [ExtractedEntity(item_name="товар (извлечено автоматически)", qty=clean_number(nums[0]), unit="шт", price=clean_number(nums[1]))]
+    # 1. Trained NER (primary)
+    if USE_TRAINED:
+        result = extract_with_trained_ner(text)
+        if result:
+            return result[:10]
 
-    return extracted[:10]
+    # 2. Regex patterns (fallback)
+    result = find_items_regex(text)
+    if result:
+        return result[:10]
 
+    # 3. Heuristic NLP (last resort)
+    return extract_with_heuristics(text)[:10]
+
+
+# ── Mock APIs (kept for demo/testing) ────────────────────────────────────────
 @app.get("/mock-api/goszakup/v3/contracts/recent")
 def get_recent_contracts():
-    """
-    Эмулятор API Портала Госзакупок Казахстана.
-    Возвращает список из 1-3 случайных спецификаций договоров.
-    """
     templates = [
         "Предметом договора является Бумага офисная А4, объем закупки: {qty} пачка. Стоимость составляет {price} KZT.",
         "Сатып алынатын тауар: Ноутбук HP ProBook, саны {qty} дана. Бағасы {price} KZT.",
         "Предметом договора является Принтер Canon, объем закупки: {qty} шт. Стоимость составляет {price} KZT.",
-        "Поставка Кресло офисное в количестве {qty} шт по цене {price} за единицу."
+        "Поставка Кресло офисное в количестве {qty} шт по цене {price} за единицу.",
     ]
-    
     contracts = []
-    num_contracts = random.randint(1, 3)
-    
-    for i in range(num_contracts):
-        template = random.choice(templates)
+    for _ in range(random.randint(1, 3)):
+        tpl = random.choice(templates)
         qty = random.randint(1, 100)
-        # Примерные цены для реалистичности
-        if "Бумага" in template:
+        if "Бумага" in tpl:
             price = qty * random.randint(1800, 2500)
-        elif "Ноутбук" in template:
-            price = qty * random.randint(300000, 450000)
-        elif "Принтер" in template:
-            price = qty * random.randint(80000, 150000)
+        elif "Ноутбук" in tpl:
+            price = qty * random.randint(300_000, 450_000)
+        elif "Принтер" in tpl:
+            price = qty * random.randint(80_000, 150_000)
         else:
-            price = qty * random.randint(25000, 50000)
-            
+            price = qty * random.randint(25_000, 50_000)
         contracts.append({
-            "id": f"CONT-{random.randint(100000, 999999)}",
-            "contract_specification": template.format(qty=qty, price=price),
-            "supplier_bin": f"{random.randint(100000000000, 999999999999)}",
-            "publish_date": datetime.now().isoformat()
+            "id": f"CONT-{random.randint(100_000, 999_999)}",
+            "contract_specification": tpl.format(qty=qty, price=price),
+            "supplier_bin": str(random.randint(100_000_000_000, 999_999_999_999)),
+            "publish_date": datetime.now().isoformat(),
         })
-        
     return contracts
+
 
 @app.get("/mock-api/marketplace/search")
 def search_marketplace_price(q: str):
-    """
-    Эмулятор API Маркетплейсов (Kaspi/Wildberries).
-    Принимает название товара (?q=Бумага) и возвращает "рыночную" цену с небольшим разбросом.
-    """
-    # Базовые рыночные цены
     baselines = {
-        "бумага": 1800,
-        "ноутбук": 350000,
-        "принтер": 95000,
-        "кресло": 30000,
-        "сиыр": 2800,
-        "мясо": 2800,
-        "dell": 450000
+        "бумага": 1800, "ноутбук": 350_000, "принтер": 95_000,
+        "кресло": 30_000, "мясо": 2_800, "dell": 450_000,
     }
-
-    query_lower = q.lower()
-    base_price = 1000.0  # Дефолтная цена, если товар совсем неизвестен
-
-    # Ищем совпадение по ключевым словам
-    for key, price in baselines.items():
-        if key in query_lower:
-            base_price = price
-            break
-
-    # Добавляем случайный разброс цен от -5% до +5%,
-    # чтобы цены каждый день были чуть-чуть разными, как в реальной жизни!
-    random_variance = random.uniform(0.95, 1.05)
-    final_price = round(base_price * random_variance, 2)
-
+    base = next((v for k, v in baselines.items() if k in q.lower()), 1000.0)
+    final = round(base * random.uniform(0.95, 1.05), 2)
     return {
         "query": q,
         "source": random.choice(["Kaspi.kz", "Wildberries.kz", "Satu.kz"]),
         "timestamp": datetime.now().isoformat(),
-        "data": [
-            {
-                "product_name": q,
-                "average_market_price": final_price,
-                "currency": "KZT",
-                "in_stock": True
-            }
-        ]
+        "data": [{"product_name": q, "average_market_price": final, "currency": "KZT", "in_stock": True}],
     }
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
