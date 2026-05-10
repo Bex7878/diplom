@@ -4,10 +4,159 @@ import jsPDF from 'jspdf';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url,
-).toString();
+// Use a more robust way to set the worker for pdfjs-dist 5.x
+// If this fails, PDF parsing will just not work, but the app shouldn't crash
+try {
+    const workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+} catch (e) {
+    console.error('Failed to set pdf.js worker:', e);
+}
+
+/* ── Sub-components (Defined before main component to avoid hoisting issues) ── */
+
+const LoadingSpinner = ({ label }) => (
+    <span className="flex items-center justify-center">
+        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        {label}
+    </span>
+);
+
+const RiskBadge = ({ isHighRisk }) => (
+    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+        isHighRisk ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+    }`}>
+        {isHighRisk ? 'High Risk' : 'Acceptable'}
+    </span>
+);
+
+const StatBox = ({ label, value }) => (
+    <div className="bg-gray-50 p-3 rounded-lg">
+        <p className="text-gray-500 text-xs font-semibold uppercase mb-1">{label}</p>
+        <p className="text-xl font-bold text-gray-900">{value || '—'}</p>
+    </div>
+);
+
+const SOURCE_LABELS = {
+    MANUAL: 'Manual Input',
+    API: 'External API',
+    IMPORT: 'File Import',
+    SYSTEM: 'System',
+    AMAZON: 'Amazon',
+    KASPI: 'Kaspi',
+};
+
+const IndicatorsTable = ({ indicators }) => (
+    <div className="px-6 pb-4 bg-white">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+            All Market Indicators ({indicators?.length || 0})
+        </p>
+        <div className="overflow-x-auto rounded-lg border border-gray-100">
+            <table className="w-full text-sm">
+                <thead>
+                    <tr className="bg-gray-50 text-xs text-gray-500 uppercase font-bold">
+                        <th className="px-4 py-2 text-left">#</th>
+                        <th className="px-4 py-2 text-left">Source</th>
+                        <th className="px-4 py-2 text-right">Price (KZT)</th>
+                        <th className="px-4 py-2 text-right">Deviation</th>
+                        <th className="px-4 py-2 text-center">Risk</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {(indicators || []).map((ind, i) => (
+                        <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-400 font-mono text-xs">{i + 1}</td>
+                            <td className="px-4 py-2">
+                                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded">
+                                    {SOURCE_LABELS[ind.source] || ind.source}
+                                </span>
+                            </td>
+                            <td className="px-4 py-2 text-right font-bold text-gray-800">
+                                {ind.price?.toLocaleString()}
+                            </td>
+                            <td className={`px-4 py-2 text-right font-bold ${ind.isHighRisk ? 'text-red-600' : 'text-green-600'}`}>
+                                {ind.deviation > 0 ? '+' : ''}{ind.deviation?.toFixed(1)}%
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${ind.isHighRisk ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                    {ind.isHighRisk ? 'High' : 'OK'}
+                                </span>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    </div>
+);
+
+const DeviationBox = ({ deviation, isHighRisk }) => (
+    <div className={`p-3 rounded-lg border-2 ${isHighRisk ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+        <p className="text-gray-500 text-xs font-semibold uppercase mb-1">Price Deviation</p>
+        <p className={`text-2xl font-black ${isHighRisk ? 'text-red-600' : 'text-green-600'}`}>
+            {(deviation || 0) > 0 ? '+' : ''}{(deviation || 0).toFixed(1)}%
+        </p>
+    </div>
+);
+
+const LotResultCard = ({ result }) => {
+    if (!result) return null;
+    const isHighRisk = result.isHighRisk;
+    const sourceLabel = result.marketSource === 'market_indicator'
+        ? '📊 Market Indicator'
+        : '📈 Historical Average';
+
+    return (
+        <div className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${
+            isHighRisk ? 'border-red-200' : 'border-green-200'
+        }`}>
+            <div className={`px-6 py-4 flex justify-between items-start ${isHighRisk ? 'bg-red-50' : 'bg-green-50'}`}>
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{isHighRisk ? '🚩' : '✅'}</span>
+                        <h3 className="text-lg font-bold text-gray-800">{result.truName}</h3>
+                    </div>
+                    <div className="flex gap-3 text-xs text-gray-500">
+                        <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">ID: {result.lotId}</span>
+                        {result.customerBin && (
+                            <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">BIN: {result.customerBin}</span>
+                        )}
+                    </div>
+                </div>
+                <RiskBadge isHighRisk={isHighRisk} />
+            </div>
+
+            <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4 bg-white">
+                <StatBox label="Lot Unit Price" value={`${Number(result.unitPrice || 0).toLocaleString()} KZT`} />
+                <StatBox label="Market Baseline" value={`${(result.marketPrice || 0).toLocaleString()} KZT`} />
+                <StatBox label="Quantity" value={`${Number(result.quantity || 0).toLocaleString()} ${result.unit || 'ед.'}`} />
+                <DeviationBox deviation={result.deviationPercentage} isHighRisk={isHighRisk} />
+            </div>
+
+            {result.allIndicators?.length > 0 && (
+                <IndicatorsTable indicators={result.allIndicators} />
+            )}
+
+            {result.totalSum != null && (
+                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-sm">
+                    <span className="text-gray-500 font-semibold">
+                        Total Sum: <span className="text-gray-800 font-bold">{Number(result.totalSum).toLocaleString()} KZT</span>
+                    </span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                        result.marketSource === 'market_indicator'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-amber-100 text-amber-700'
+                    }`}>{sourceLabel}</span>
+                </div>
+            )}
+        </div>
+    );
+};
+
+/* ── Main Component ── */
 
 const SpotCheck = () => {
     const [mode, setMode] = useState('text'); // 'text' | 'lot'
@@ -37,13 +186,34 @@ const SpotCheck = () => {
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+    // Load draft on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('spotcheck_draft');
+        if (saved) setText(saved);
+    }, []);
+
+    // Auto-save draft with debounce
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (text && text.trim()) {
+                localStorage.setItem('spotcheck_draft', text);
+                setDraftSaved(true);
+                setTimeout(() => setDraftSaved(false), 2000);
+            } else {
+                localStorage.removeItem('spotcheck_draft');
+            }
+        }, 600);
+        return () => clearTimeout(timer);
+    }, [text]);
+
     const fetchHistory = async () => {
         try {
             const response = await fetch(`${apiUrl}/api/analysis/contracts`, { credentials: 'include' });
             if (response.ok) {
                 const data = await response.json();
-                // Sort by date descending
-                setHistory(data.sort((a, b) => b.id - a.id));
+                if (Array.isArray(data)) {
+                    setHistory(data.sort((a, b) => (b.id || 0) - (a.id || 0)));
+                }
             }
         } catch (err) {
             console.error('Failed to fetch history:', err);
@@ -51,6 +221,7 @@ const SpotCheck = () => {
     };
 
     const loadHistoryItem = async (item) => {
+        if (!item || !item.id) return;
         setLoading(true);
         setError(null);
         setResults([]);
@@ -63,7 +234,11 @@ const SpotCheck = () => {
             
             setText(item.originalText || '');
             setThreshold(item.threshold?.toString() || '20');
-            setResults(data);
+            if (Array.isArray(data)) {
+                setResults(data);
+            } else {
+                setResults([]);
+            }
         } catch (err) {
             setError(err.message);
             setLoadedFromHistory(false);
@@ -72,7 +247,14 @@ const SpotCheck = () => {
         }
     };
 
+    const handleThresholdChange = (e) => {
+        const value = e.target.value;
+        setThreshold(value);
+        localStorage.setItem('userRiskThreshold', value);
+    };
+
     const handleAnalyzeText = async () => {
+        if (!text || !text.trim()) return;
         setLoading(true);
         setError(null);
         setResults([]);
@@ -92,7 +274,11 @@ const SpotCheck = () => {
             if (!response.ok) throw new Error('Analysis failed. Please check the contract text.');
 
             const data = await response.json();
-            setResults(data);
+            if (Array.isArray(data)) {
+                setResults(data);
+            } else {
+                setResults([]);
+            }
         } catch (err) {
             setError(err.message);
         } finally {
@@ -101,7 +287,7 @@ const SpotCheck = () => {
     };
 
     const handleAnalyzeLot = async () => {
-        if (!lotId.trim()) return;
+        if (!lotId || !lotId.trim()) return;
         setLoading(true);
         setError(null);
         setLotResult(null);
@@ -128,7 +314,7 @@ const SpotCheck = () => {
     };
 
     const handleExportPdf = async (ref, filename) => {
-        if (!ref.current) return;
+        if (!ref || !ref.current) return;
         setExporting(true);
         try {
             const canvas = await html2canvas(ref.current, {
@@ -153,12 +339,15 @@ const SpotCheck = () => {
                 heightLeft -= pageHeight;
             }
             pdf.save(filename);
+        } catch (err) {
+            console.error('PDF Export failed:', err);
         } finally {
             setExporting(false);
         }
     };
 
     const parseFile = async (file) => {
+        if (!file) return;
         const isPdf = file.type === 'application/pdf';
         const isDocx = file.name.endsWith('.docx') ||
             file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -185,21 +374,22 @@ const SpotCheck = () => {
                 extracted = result.value;
             }
 
-            setText(extracted.trim());
+            setText((extracted || '').trim());
             setFileStatus({ state: 'done', name: file.name });
-        } catch {
+        } catch (err) {
+            console.error('File parsing failed:', err);
             setFileStatus({ state: 'error', name: file.name, msg: 'Failed to parse file. Try copying the text manually.' });
         }
     };
 
     const handleFileDrop = (e) => {
         e.preventDefault();
-        const file = e.dataTransfer.files[0];
+        const file = e.dataTransfer?.files[0];
         if (file) parseFile(file);
     };
 
     const handleFileInput = (e) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0];
         if (file) parseFile(file);
         e.target.value = '';
     };
@@ -282,7 +472,6 @@ const SpotCheck = () => {
                         <span className="mr-2 text-blue-500">📄</span> Contract Text:
                     </label>
 
-                    {/* File upload zone */}
                     <div
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={handleFileDrop}
@@ -405,7 +594,6 @@ const SpotCheck = () => {
                 </div>
             )}
 
-            {/* Error */}
             {error && (
                 <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md mb-8 flex items-center">
                     <span className="mr-3 text-xl">⚠️</span>
@@ -427,13 +615,13 @@ const SpotCheck = () => {
                         </button>
                     </div>
                     <div ref={lotResultRef}>
-                        <LotResultCard result={lotResult} threshold={parseFloat(threshold)} />
+                        <LotResultCard result={lotResult} />
                     </div>
                 </div>
             )}
 
             {/* ── TEXT RESULTS ── */}
-            {results.length > 0 && (
+            {Array.isArray(results) && results.length > 0 && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="flex items-center justify-between border-b border-gray-200 pb-2">
                         <div className="flex items-center gap-3">
@@ -458,8 +646,8 @@ const SpotCheck = () => {
 
                     <div ref={textResultsRef} className="space-y-6">
                     {results.map((result, index) => {
-                        const isHighRisk = result.isHighRisk;
-                        const sourceLabel = result.marketSource === 'market_indicator'
+                        const isHighRisk = result?.isHighRisk;
+                        const sourceLabel = result?.marketSource === 'market_indicator'
                             ? '📊 Market Indicator'
                             : '📈 Historical Average';
                         return (
@@ -472,22 +660,22 @@ const SpotCheck = () => {
                                 <div className={`px-6 py-3 flex justify-between items-center ${isHighRisk ? 'bg-red-50' : 'bg-green-50'}`}>
                                     <h3 className="text-lg font-bold text-gray-800 flex items-center">
                                         <span className="mr-2">{isHighRisk ? '🚩' : '✅'}</span>
-                                        {result.item?.item_name || 'Unnamed Item'}
+                                        {result?.item?.item_name || 'Unnamed Item'}
                                     </h3>
                                     <RiskBadge isHighRisk={isHighRisk} />
                                 </div>
                                 <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 bg-white">
-                                    <StatBox label="Extracted Price" value={`${result.item?.price?.toLocaleString()} KZT`} />
-                                    <StatBox label="Market Baseline" value={`${result.marketPrice?.toLocaleString()} KZT`} />
-                                    <StatBox label="Quantity" value={`${result.item?.qty || 0} ${result.item?.unit || 'ед.'}`} />
-                                    <DeviationBox deviation={result.deviationPercentage} isHighRisk={isHighRisk} />
+                                    <StatBox label="Extracted Price" value={`${(result?.item?.price || 0).toLocaleString()} KZT`} />
+                                    <StatBox label="Market Baseline" value={`${(result?.marketPrice || 0).toLocaleString()} KZT`} />
+                                    <StatBox label="Quantity" value={`${result?.item?.qty || 0} ${result?.item?.unit || 'ед.'}`} />
+                                    <DeviationBox deviation={result?.deviationPercentage} isHighRisk={isHighRisk} />
                                 </div>
-                                {result.allIndicators?.length > 0 && (
+                                {result?.allIndicators?.length > 0 && (
                                     <IndicatorsTable indicators={result.allIndicators} />
                                 )}
                                 <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex justify-between items-center">
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                                        result.marketSource === 'market_indicator'
+                                        result?.marketSource === 'market_indicator'
                                             ? 'bg-blue-100 text-blue-700'
                                             : 'bg-amber-100 text-amber-700'
                                     }`}>{sourceLabel}</span>
@@ -530,7 +718,7 @@ const SpotCheck = () => {
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                            {history.length === 0 ? (
+                            {(!history || history.length === 0) ? (
                                 <div className="text-center py-12">
                                     <p className="text-4xl mb-2">📭</p>
                                     <p className="text-gray-400 font-bold">No history found</p>
@@ -547,7 +735,7 @@ const SpotCheck = () => {
                                                 ID: #{item.id}
                                             </span>
                                             <span className="text-xs text-gray-400 font-medium">
-                                                {new Date(item.date).toLocaleDateString()}
+                                                {item.date ? new Date(item.date).toLocaleDateString() : '—'}
                                             </span>
                                         </div>
                                         <p className="text-sm text-gray-700 line-clamp-2 italic">
@@ -566,171 +754,6 @@ const SpotCheck = () => {
                             )}
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-/* ── Sub-components ── */
-
-const LoadingSpinner = ({ label }) => (
-    <span className="flex items-center justify-center">
-        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
-        {label}
-    </span>
-);
-
-const RiskBadge = ({ isHighRisk }) => (
-    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-        isHighRisk ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
-    }`}>
-        {isHighRisk ? 'High Risk' : 'Acceptable'}
-    </span>
-);
-
-const StatBox = ({ label, value }) => (
-    <div className="bg-gray-50 p-3 rounded-lg">
-        <p className="text-gray-500 text-xs font-semibold uppercase mb-1">{label}</p>
-        <p className="text-xl font-bold text-gray-900">{value}</p>
-    </div>
-);
-
-const SOURCE_LABELS = {
-    MANUAL: 'Manual Input',
-    API: 'External API',
-    IMPORT: 'File Import',
-    SYSTEM: 'System',
-    AMAZON: 'Amazon',
-    KASPI: 'Kaspi',
-};
-
-const IndicatorsTable = ({ indicators }) => (
-    <div className="px-6 pb-4 bg-white">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-            All Market Indicators ({indicators.length})
-        </p>
-        <div className="overflow-x-auto rounded-lg border border-gray-100">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="bg-gray-50 text-xs text-gray-500 uppercase font-bold">
-                        <th className="px-4 py-2 text-left">#</th>
-                        <th className="px-4 py-2 text-left">Source</th>
-                        <th className="px-4 py-2 text-right">Price (KZT)</th>
-                        <th className="px-4 py-2 text-right">Deviation</th>
-                        <th className="px-4 py-2 text-center">Risk</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {indicators.map((ind, i) => (
-                        <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
-                            <td className="px-4 py-2 text-gray-400 font-mono text-xs">{i + 1}</td>
-                            <td className="px-4 py-2">
-                                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded">
-                                    {SOURCE_LABELS[ind.source] || ind.source}
-                                </span>
-                            </td>
-                            <td className="px-4 py-2 text-right font-bold text-gray-800">
-                                {ind.price?.toLocaleString()}
-                            </td>
-                            <td className={`px-4 py-2 text-right font-bold ${ind.isHighRisk ? 'text-red-600' : 'text-green-600'}`}>
-                                {ind.deviation > 0 ? '+' : ''}{ind.deviation?.toFixed(1)}%
-                            </td>
-                            <td className="px-4 py-2 text-center">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${ind.isHighRisk ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                    {ind.isHighRisk ? 'High' : 'OK'}
-                                </span>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </div>
-);
-
-const DeviationBox = ({ deviation, isHighRisk }) => (
-    <div className={`p-3 rounded-lg border-2 ${isHighRisk ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
-        <p className="text-gray-500 text-xs font-semibold uppercase mb-1">Price Deviation</p>
-        <p className={`text-2xl font-black ${isHighRisk ? 'text-red-600' : 'text-green-600'}`}>
-            {deviation > 0 ? '+' : ''}{deviation?.toFixed(1)}%
-        </p>
-    </div>
-);
-
-const LotResultCard = ({ result }) => {
-    const isHighRisk = result.isHighRisk;
-    const sourceLabel = result.marketSource === 'market_indicator'
-        ? '📊 Market Indicator'
-        : '📈 Historical Average';
-
-    return (
-        <div className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-500 ${
-            isHighRisk ? 'border-red-200' : 'border-green-200'
-        }`}>
-            {/* Header */}
-            <div className={`px-6 py-4 flex justify-between items-start ${isHighRisk ? 'bg-red-50' : 'bg-green-50'}`}>
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg">{isHighRisk ? '🚩' : '✅'}</span>
-                        <h3 className="text-lg font-bold text-gray-800">{result.truName}</h3>
-                    </div>
-                    <div className="flex gap-3 text-xs text-gray-500">
-                        <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">ID: {result.lotId}</span>
-                        {result.customerBin && (
-                            <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">BIN: {result.customerBin}</span>
-                        )}
-                    </div>
-                </div>
-                <RiskBadge isHighRisk={isHighRisk} />
-            </div>
-
-            {/* Stats grid */}
-            <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4 bg-white">
-                <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-gray-500 text-xs font-semibold uppercase mb-1">Lot Unit Price</p>
-                    <p className="text-xl font-bold text-gray-900">
-                        {Number(result.unitPrice)?.toLocaleString()}
-                        <span className="text-sm font-normal text-gray-500 ml-1">KZT</span>
-                    </p>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-gray-500 text-xs font-semibold uppercase mb-1">Market Baseline</p>
-                    <p className="text-xl font-bold text-gray-900">
-                        {result.marketPrice?.toLocaleString()}
-                        <span className="text-sm font-normal text-gray-500 ml-1">KZT</span>
-                    </p>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-gray-500 text-xs font-semibold uppercase mb-1">Quantity</p>
-                    <p className="text-xl font-bold text-gray-900">
-                        {Number(result.quantity)?.toLocaleString()}
-                        <span className="text-sm font-normal text-gray-500 ml-1">{result.unit || 'ед.'}</span>
-                    </p>
-                </div>
-                <DeviationBox deviation={result.deviationPercentage} isHighRisk={isHighRisk} />
-            </div>
-
-            {result.allIndicators?.length > 0 && (
-                <IndicatorsTable indicators={result.allIndicators} />
-            )}
-
-            {/* Total sum row */}
-            {result.totalSum != null && (
-                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-sm">
-                    <span className="text-gray-500 font-semibold">
-                        Total Sum: <span className="text-gray-800 font-bold">{Number(result.totalSum)?.toLocaleString()} KZT</span>
-                    </span>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                        result.marketSource === 'market_indicator'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-amber-100 text-amber-700'
-                    }`}>
-                        {sourceLabel}
-                    </span>
                 </div>
             )}
         </div>
