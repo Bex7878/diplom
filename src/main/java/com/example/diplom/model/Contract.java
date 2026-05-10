@@ -23,6 +23,11 @@ public class Contract {
     @Column(nullable = false)
     private LocalDate date;
 
+    @Column(columnDefinition = "TEXT")
+    private String originalText;
+
+    private Double threshold;
+
     @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ExtractedItemEntity> extractedItems;
 }

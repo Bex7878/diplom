@@ -124,6 +124,13 @@ public class AnalysisService {
 
     @Transactional
     public List<RiskAssessment> analyzeAndSaveContract(String contractText, String bin, Double threshold) {
+        // 0. Проверка кэша (если такой текст с таким порогом уже анализировался)
+        Optional<Contract> existingContract = contractRepository.findFirstByOriginalTextAndThresholdOrderByDateDesc(contractText, threshold);
+        if (existingContract.isPresent()) {
+            logger.info("Found cached analysis for the given text and threshold.");
+            return convertToRiskAssessments(existingContract.get());
+        }
+
         // 1. Извлечение данных через Python NLP сервис
         AnalysisRequest nlpRequest = new AnalysisRequest(contractText);
         ResponseEntity<ExtractedItem[]> response;
@@ -143,6 +150,8 @@ public class AnalysisService {
         Contract contract = Contract.builder()
                 .bin(bin)
                 .date(LocalDate.now())
+                .originalText(contractText)
+                .threshold(threshold)
                 .extractedItems(new ArrayList<>())
                 .build();
         contract = contractRepository.save(contract);
@@ -190,7 +199,7 @@ public class AnalysisService {
             // 5. Сохранение лога бенчмарка
             BenchmarkLog log = BenchmarkLog.builder()
                     .extractedItem(itemEntity)
-                    .marketIndicator(null)
+                    .marketIndicator(!indicators.isEmpty() ? indicators.get(0) : null)
                     .deviationPercentage(deviation)
                     .similarityScore(BigDecimal.ONE)
                     .build();
@@ -200,6 +209,61 @@ public class AnalysisService {
         }
 
         return assessments;
+    }
+
+    private List<RiskAssessment> convertToRiskAssessments(Contract contract) {
+        List<RiskAssessment> assessments = new ArrayList<>();
+        BigDecimal riskThreshold = (contract.getThreshold() != null)
+                ? BigDecimal.valueOf(contract.getThreshold())
+                : BigDecimal.valueOf(20);
+
+        for (ExtractedItemEntity itemEntity : contract.getExtractedItems()) {
+            Optional<BenchmarkLog> logOpt = benchmarkLogRepository.findByExtractedItem(itemEntity);
+            if (logOpt.isPresent()) {
+                BenchmarkLog log = logOpt.get();
+                ExtractedItem itemDto = new ExtractedItem(
+                        itemEntity.getItemName(),
+                        itemEntity.getQty().doubleValue(),
+                        itemEntity.getUnit(),
+                        itemEntity.getPrice().doubleValue()
+                );
+
+                BigDecimal marketPrice;
+                String marketSource;
+                List<MarketIndicator> indicators = findAllIndicators(itemEntity.getItemName());
+                List<MarketComparison> allComparisons;
+
+                if (log.getMarketIndicator() != null) {
+                    marketPrice = log.getMarketIndicator().getBaselinePrice();
+                    marketSource = "market_indicator";
+                    allComparisons = buildComparisons(indicators, itemEntity.getPrice(), riskThreshold);
+                } else {
+                    marketPrice = itemEntity.getPrice()
+                            .divide(log.getDeviationPercentage().divide(BigDecimal.valueOf(100)).add(BigDecimal.ONE), 2, RoundingMode.HALF_UP);
+                    marketSource = "historical_average";
+                    allComparisons = List.of();
+                }
+
+                boolean isHighRisk = log.getDeviationPercentage().compareTo(riskThreshold) > 0;
+
+                assessments.add(new RiskAssessment(
+                        itemDto,
+                        marketPrice.doubleValue(),
+                        marketSource,
+                        log.getDeviationPercentage().doubleValue(),
+                        isHighRisk,
+                        allComparisons
+                ));
+            }
+        }
+        return assessments;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RiskAssessment> getContractResults(Long id) {
+        Contract contract = contractRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Contract not found with id: " + id));
+        return convertToRiskAssessments(contract);
     }
 
     @Transactional(readOnly = true)

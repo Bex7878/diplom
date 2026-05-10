@@ -25,44 +25,58 @@ const SpotCheck = () => {
     const [threshold, setThreshold] = useState(localStorage.getItem('userRiskThreshold') || '20');
     const [exporting, setExporting] = useState(false);
 
+    const [history, setHistory] = useState([]);
+    const [showHistory, setShowHistory] = useState(false);
+    const [loadedFromHistory, setLoadedFromHistory] = useState(false);
+
     const textResultsRef = useRef(null);
     const lotResultRef = useRef(null);
     const fileInputRef = useRef(null);
     const [draftSaved, setDraftSaved] = useState(false);
     const [fileStatus, setFileStatus] = useState({ state: 'idle', name: '' });
 
-    // Load draft on mount
-    useEffect(() => {
-        const saved = localStorage.getItem('spotcheck_draft');
-        if (saved) setText(saved);
-    }, []);
-
-    // Auto-save draft with debounce
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (text.trim()) {
-                localStorage.setItem('spotcheck_draft', text);
-                setDraftSaved(true);
-                setTimeout(() => setDraftSaved(false), 2000);
-            } else {
-                localStorage.removeItem('spotcheck_draft');
-            }
-        }, 600);
-        return () => clearTimeout(timer);
-    }, [text]);
-
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
-    const handleThresholdChange = (e) => {
-        const value = e.target.value;
-        setThreshold(value);
-        localStorage.setItem('userRiskThreshold', value);
+    const fetchHistory = async () => {
+        try {
+            const response = await fetch(`${apiUrl}/api/analysis/contracts`, { credentials: 'include' });
+            if (response.ok) {
+                const data = await response.json();
+                // Sort by date descending
+                setHistory(data.sort((a, b) => b.id - a.id));
+            }
+        } catch (err) {
+            console.error('Failed to fetch history:', err);
+        }
+    };
+
+    const loadHistoryItem = async (item) => {
+        setLoading(true);
+        setError(null);
+        setResults([]);
+        setLoadedFromHistory(true);
+        setShowHistory(false);
+        try {
+            const response = await fetch(`${apiUrl}/api/analysis/contracts/${item.id}`, { credentials: 'include' });
+            if (!response.ok) throw new Error('Failed to load history details.');
+            const data = await response.json();
+            
+            setText(item.originalText || '');
+            setThreshold(item.threshold?.toString() || '20');
+            setResults(data);
+        } catch (err) {
+            setError(err.message);
+            setLoadedFromHistory(false);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleAnalyzeText = async () => {
         setLoading(true);
         setError(null);
         setResults([]);
+        setLoadedFromHistory(false);
         try {
             const response = await fetch(`${apiUrl}/api/analysis/spot-check`, {
                 method: 'POST',
@@ -200,9 +214,17 @@ const SpotCheck = () => {
 
     return (
         <div className="max-w-4xl mx-auto">
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-800">Contract Spot-Check</h1>
-                <p className="text-gray-600 italic">Analyze procurement data for price deviations</p>
+            <header className="mb-8 flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-800">Contract Spot-Check</h1>
+                    <p className="text-gray-600 italic">Analyze procurement data for price deviations</p>
+                </div>
+                <button
+                    onClick={() => { setShowHistory(true); fetchHistory(); }}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-bold rounded-lg shadow-sm transition-all"
+                >
+                    📜 Search History
+                </button>
             </header>
 
             {/* Mode Tabs */}
@@ -419,6 +441,11 @@ const SpotCheck = () => {
                             <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
                                 {results.length} item(s) found
                             </span>
+                            {loadedFromHistory && (
+                                <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded uppercase border border-amber-200 animate-pulse">
+                                    📜 Loaded from History
+                                </span>
+                            )}
                         </div>
                         <button
                             onClick={() => handleExportPdf(textResultsRef, 'text-analysis-results.pdf')}
@@ -483,6 +510,62 @@ const SpotCheck = () => {
                             ? 'Enter a Goszakup lot ID above to start the risk assessment.'
                             : 'Paste your contract specification text above to start the risk assessment.'}
                     </p>
+                </div>
+            )}
+
+            {/* History Modal */}
+            {showHistory && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-800">Search History</h2>
+                                <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mt-0.5">Previous Text Analyses</p>
+                            </div>
+                            <button
+                                onClick={() => setShowHistory(false)}
+                                className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {history.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <p className="text-4xl mb-2">📭</p>
+                                    <p className="text-gray-400 font-bold">No history found</p>
+                                </div>
+                            ) : (
+                                history.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => loadHistoryItem(item)}
+                                        className="w-full text-left p-4 rounded-xl border border-gray-100 hover:border-blue-300 hover:bg-blue-50/30 transition-all group"
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                                ID: #{item.id}
+                                            </span>
+                                            <span className="text-xs text-gray-400 font-medium">
+                                                {new Date(item.date).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-gray-700 line-clamp-2 italic">
+                                            "{item.originalText || 'No text content'}"
+                                        </p>
+                                        <div className="mt-2 flex items-center gap-3">
+                                            <span className="text-[10px] font-black text-gray-400 uppercase">
+                                                Threshold: {item.threshold || 20}%
+                                            </span>
+                                            <span className="text-blue-500 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                                Load results →
+                                            </span>
+                                        </div>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

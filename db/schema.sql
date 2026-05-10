@@ -4,7 +4,9 @@
 CREATE TABLE contracts (
     id SERIAL PRIMARY KEY,
     bin VARCHAR(12) NOT NULL, -- Business Identification Number
-    date DATE NOT NULL
+    date DATE NOT NULL,
+    original_text TEXT,
+    threshold NUMERIC
 );
 
 -- Stores entities extracted from the contract text by the NLP service

@@ -37,6 +37,12 @@ public class AnalysisController {
         return analysisService.getAllContracts();
     }
 
+    // Получить детальные результаты конкретного анализа по его ID
+    @GetMapping("/contracts/{id}")
+    public List<RiskAssessment> getContractDetails(@PathVariable Long id) {
+        return analysisService.getContractResults(id);
+    }
+
     // Получить только рискованные операции
     @GetMapping("/risks")
     public List<BenchmarkLog> getRisks(@RequestParam(required = false) Double threshold) {
