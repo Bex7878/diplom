@@ -10,5 +10,6 @@ import java.util.Optional;
 @Repository
 public interface BenchmarkLogRepository extends JpaRepository<BenchmarkLog, Long> {
     List<BenchmarkLog> findByDeviationPercentageGreaterThan(BigDecimal threshold);
+    List<BenchmarkLog> findTop10ByOrderByDeviationPercentageDesc();
     Optional<BenchmarkLog> findByExtractedItem(com.example.diplom.model.ExtractedItemEntity extractedItem);
 }

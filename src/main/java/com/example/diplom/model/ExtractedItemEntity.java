@@ -19,7 +19,6 @@ public class ExtractedItemEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id")
-    @JsonIgnore
     private Contract contract;
 
     @Column(name = "item_name", nullable = false)

@@ -6,6 +6,7 @@ import Register from './Register';
 import LotSearch from './LotSearch';
 import Layout from './Layout';
 import AdminPanel from './AdminPanel';
+import TopRisks from './TopRisks';
 
 // A simple protected route component
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -42,6 +43,14 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <LotSearch />
+                        </ProtectedRoute>
+                    } 
+                />
+                <Route 
+                    path="/top-risks" 
+                    element={
+                        <ProtectedRoute>
+                            <TopRisks />
                         </ProtectedRoute>
                     } 
                 />

@@ -327,6 +327,10 @@ public class AnalysisService {
         BigDecimal riskThreshold = (threshold != null) ? BigDecimal.valueOf(threshold) : BigDecimal.valueOf(20);
         return benchmarkLogRepository.findByDeviationPercentageGreaterThan(riskThreshold);
     }
+
+    public List<BenchmarkLog> getTop10Risks() {
+        return benchmarkLogRepository.findTop10ByOrderByDeviationPercentageDesc();
+    }
     
     @Transactional
     public MarketIndicator updateMarketPrice(String itemName, double price) {

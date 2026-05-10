@@ -49,6 +49,12 @@ public class AnalysisController {
         return analysisService.getHighRiskOperations(threshold);
     }
 
+    // Получить топ-10 рисков
+    @GetMapping("/top-risks")
+    public List<BenchmarkLog> getTopRisks() {
+        return analysisService.getTop10Risks();
+    }
+
     // Анализ лота из parsed_lots по lot_id с сравнением с market_indicators
     @GetMapping("/analyze-lot")
     public ResponseEntity<?> analyzeLot(

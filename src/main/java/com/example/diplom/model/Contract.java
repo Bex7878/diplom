@@ -29,5 +29,6 @@ public class Contract {
     private Double threshold;
 
     @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<ExtractedItemEntity> extractedItems;
 }

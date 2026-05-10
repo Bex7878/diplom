@@ -18,6 +18,7 @@ const Layout = ({ children }) => {
     const navItems = [
         { path: '/', label: 'Spot-Check', icon: '🔍' },
         { path: '/lots', label: 'Historical Lots', icon: '📊' },
+        { path: '/top-risks', label: 'Top Risks', icon: '🚩' },
     ];
 
     if (userRole === 'ROLE_ADMIN') {
