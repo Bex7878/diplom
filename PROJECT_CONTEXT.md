@@ -1,91 +1,86 @@
-# Technical Specification: Project "Diplom"
+# Complete Technical Compendium
 
-## 1. Executive Summary
-The "Diplom" project is an AI-powered compliance and anti-corruption tool designed for the Kazakhstan public procurement sector. It solves the problem of manual price monitoring by automatically extracting commercial terms from unstructured text (PDF/Word/Plain text) and cross-referencing them against real-time and historical market data.
-
----
-
-## 2. System Architecture & Data Flow
-
-### A. The "Spot Check" Pipeline (Contract Analysis)
-1.  **Frontend (React):** User submits a block of text and a BIN (Business Identification Number).
-2.  **Backend (Spring Boot):** Receives the `AnalysisRequest`.
-3.  **NLP Service (FastAPI):**
-    *   **Preprocessing:** `normalizer.py` cleans the text (removes noise, standardizes currency like "тг", "тенге").
-    *   **NER Extraction:** The `extract_with_trained_ner` function uses a custom-trained SpaCy model (`./ner_model`) to find entities:
-        *   `ITEM`: "Бумага А4 SvetoCopy"
-        *   `QTY`: "500"
-        *   `UNIT`: "пачка"
-        *   `PRICE`: "2500"
-4.  **Backend (Risk Engine):**
-    *   **Normalization:** Converts units (e.g., "шт" vs "штук").
-    *   **Market Lookup:** Queries `MarketIndicatorRepository` using three strategies:
-        1.  Exact match (Ru/Kk/En names).
-        2.  Fuzzy "contains" search.
-        3.  Fallback to general category prices.
-    *   **Risk Calculation:** If `(Contract Price - Market Price) / Market Price > 0.20`, a `BenchmarkLog` is created with `isRisk = true`.
-5.  **Storage:** Saves results into `Contract`, `ExtractedItemEntity`, and `BenchmarkLog` tables.
-
-### B. The Data Ingestion Pipeline (Automation)
-1.  **Scheduled Scraper:** `DataIngestionScheduler` (Java) triggers `scraper.py` (Python) every 5 minutes.
-2.  **Session Management:** The scraper uses `requests.Session` with a `ci_session` cookie to bypass basic bot detection on `v3bl.goszakup.gov.kz`.
-3.  **HTML Parsing:** `BeautifulSoup` extracts specific table cells (БИН заказчика, Наименование ТРУ, Цена за единицу).
-4.  **Database Sync:** Scraped data is stored in the `ParsedLot` table for the "Lot Search" feature.
+## 1. Vision and Purpose
+The "Diplom" project is a high-integrity compliance ecosystem designed to identify financial anomalies in the public procurement sector of Kazakhstan. It bridges the gap between unstructured contract documentation and structured market intelligence using Natural Language Processing (NLP) and real-time web scraping.
 
 ---
 
-## 3. Detailed Component Breakdown
+## 2. Full Feature Catalog
 
-### Frontend (frontend/src/)
-*   **`SpotCheck.jsx`:** The main workspace. Features a multi-step UI:
-    *   Text input area with auto-expansion.
-    *   Dynamic Results Table: Allows users to manually override NLP mistakes.
-    *   Risk Visualization: Color-coded cards (Red/Yellow/Green) based on deviation.
-*   **`LotSearch.jsx`:** A high-performance search interface using server-side pagination to browse thousands of `ParsedLot` records.
-*   **`AdminPanel.jsx`:**
-    *   **User Management:** Edit roles via `PUT /api/admin/users/{id}/role`.
-    *   **Data Control:** File drop-zone for Excel imports (`ExcelImportService`).
-*   **`Layout.jsx`:** Persistent sidebar navigation and authentication state (JWT-based).
+### A. Intelligent Spot Check (Document Analysis)
+*   **Core Logic:** Takes raw text (contracts, specs, invoices) and identifies procurement items.
+*   **NLP Entity Extraction:** Connects to a Python FastAPI service using SpaCy to identify:
+    *   `ITEM`: Product name (standardized by `normalizer.py`).
+    *   `QTY`: Numerical volume.
+    *   `UNIT`: Measurement units (converted to canonical forms).
+    *   `PRICE`: Unit price (normalized for currency notations).
+*   **Multi-Strategy Benchmarking:**
+    1.  **Exact Matching:** Checks Ru/Kk/En names in `market_indicators`.
+    2.  **Fuzzy Search:** Uses SQL `LIKE` and "contained-in" logic to find similar items.
+    3.  **Risk Flagging:** Calculates deviation based on a user-defined or default (20%) threshold. High-risk items are highlighted in the UI and logged.
 
-### Backend (src/main/java/com/example/diplom/)
-*   **`AnalysisService.java`:**
-    *   `analyzeAndSaveContract()`: The primary orchestrator.
-    *   `triggerScraper()`: Interface for the Python FastAPI scraper.
-*   **`ExcelImportService.java`:**
-    *   Uses `Apache POI`.
-    *   **Column Mapping:** Hardcoded synonyms map "Наименование рус" or "Item Name" to the same DB field.
-*   **`SecurityConfig.java`:**
-    *   Stateless JWT authentication.
-    *   BCrypt password hashing for the `User` model.
-    *   CORS configured for `*` (development mode).
+### B. Autonomous Data Harvesting (Goszakup Scraper)
+*   **V3 Portal Integration:** A Python-based `scraper.py` targets the `v3bl.goszakup.gov.kz` search results.
+*   **Session Continuity:** Employs a `ci_session` cookie strategy to maintain access and bypass rate-limiting.
+*   **Automated Scheduling:** Spring Boot's `DataIngestionScheduler` triggers the scraper every 5 minutes (default).
+*   **Parsed Lot Repository:** Scraped data is saved to `parsed_lots` with deduplication via `lot_id` uniqueness.
 
-### NLP & Scraper Service (nlp-service/)
-*   **`main.py`:** FastAPI entry point. Includes regex-based fallbacks if the NER model fails to provide high confidence.
-*   **`scraper.py`:** 
-    *   Targets the V3 version of the Kazakhstan Procurement portal.
-    *   Extracts: Lot ID, Customer BIN, TRU Name, Description, Unit Price, Unit, Quantity, Total Sum.
-*   **`train_ner.py`:** A complete training script using SpaCy's `Example` API. It processes `ner_dataset.jsonl` to teach the model how to recognize Kazakhstani procurement terminology.
+### C. Advanced Analytics & History
+*   **Lot Analysis:** Unique feature to take a *previously scraped* lot and run the risk analysis engine against it manually (`/api/analysis/analyze-lot`).
+*   **Historical Archive:** Every "Spot Check" is saved as a `Contract` record, allowing users to revisit previous analyses.
+*   **Risk Dashboarding:** Specialized endpoints for "Top 10 Risks" and "High Risk Operations" across all contracts.
 
----
+### D. Market Data Management
+*   **Excel Power-Import:** Support for `.xlsx`/`.xls` files with a smart column mapper that handles dozens of synonyms (e.g., "Цена ед", "Cost", "Price").
+*   **Source Attribution:** Prices can be tagged by source (IMPORT, GOSZAKUP, MARKET) to weight the reliability of the benchmark.
 
-## 4. Database Schema (PostgreSQL)
-*   **`users`:** `id, username, password, role (ADMIN/USER), bin`.
-*   **`contracts`:** `id, user_id, document_text, total_items, risk_score, created_at`.
-*   **`extracted_items`:** `id, contract_id, item_name, quantity, price, unit`.
-*   **`market_indicators`:** `id, item_name_ru, item_name_kk, item_name_en, baseline_price, source (IMPORT/GOSZAKUP/MARKET)`.
-*   **`benchmark_logs`:** `id, extracted_item_id, market_indicator_id, deviation_percentage, is_risk`.
-*   **`parsed_lots`:** `id, lot_id, customer_bin, tru_name, unit_price, total_sum, scrape_date`.
+### E. Administration & Security
+*   **RBAC (Role-Based Access Control):** Differentiates between `ROLE_USER` and `ROLE_ADMIN`.
+*   **User Lifecycle:** Full CRUD for users with hidden password hashes in responses.
+*   **Initialization:** `DataLoader` ensures an `admin/admin123` account exists on first boot.
+*   **JWT Security:** Stateless authentication via signed tokens.
 
 ---
 
-## 5. Operational Workflows
-1.  **Deployment:** Docker-compose manages three containers: `db`, `backend`, and `frontend`. The Python service is usually embedded or sidecar.
-2.  **Training:** Run `python train_ner.py` to refresh the model when new procurement patterns emerge.
-3.  **Data Refresh:** Admins upload quarterly "Market Price Lists" via the Admin Panel to ensure risk calculations remain accurate.
+## System Architecture
+
+### Backend (Java 21 / Spring Boot)
+*   **Primary Service:** `AnalysisService.java` (Logic hub).
+*   **Infrastructure:** Spring Data JPA (PostgreSQL), Spring Security (JWT), Spring Task Scheduling.
+*   **Key DTOs:** `RiskAssessment`, `LotAnalysisResult`, `ExtractedItem`.
+
+### NLP Service (Python 3.10+ / FastAPI)
+*   **Engine:** SpaCy (Custom NER model + `ru_core_news_sm` fallback).
+*   **Scraper:** BeautifulSoup4 / Requests (Session-based).
+*   **Training Utility:** `train_ner.py` for continuous model improvement.
+
+### Frontend (React / Vite)
+*   **Stack:** Tailwind CSS, Lucide Icons, Axios.
+*   **Key Components:** 
+    *   `SpotCheck.jsx`: Document analysis UI.
+    *   `LotSearch.jsx`: Scraped data browser.
+    *   `AdminPanel.jsx`: System control and user management.
 
 ---
 
-## Security Features
-*   **JWT Protection:** Every API call (except `/auth/**`) requires a valid Bearer token.
-*   **Role-Based Access (RBAC):** Only `ADMIN` can access `/api/admin/**` and trigger the scraper.
-*   **Data Integrity:** Transactional updates in Spring Boot ensure partial data is never saved if an NLP call fails.
+## Database Architecture (PostgreSQL)
+
+| Table | Purpose | Key Relations |
+| :--- | :--- | :--- |
+| `users` | Auth & Identity | 1:N with `contracts` |
+| `contracts` | Analysis Headers | 1:N with `extracted_items` |
+| `extracted_items` | Raw NLP Data | 1:1 with `benchmarks_log` |
+| `market_indicators` | Benchmarks | Referenced by `benchmarks_log` |
+| `benchmarks_log` | Risk Metrics | Connects items to market data |
+| `parsed_lots` | Scraped Data | Independent repository for searching |
+
+---
+
+## Developer Operations (DevOps)
+*   **Environment Config:** Managed via `application.properties` and environment variables (`NLP_SERVICE_URL`, `PYTHON_BASE_URL`).
+*   **Docker Ready:** Dockerfiles provided for all services with `docker-compose.yml` orchestrating the whole stack.
+*   **CORS:** Configured for cross-origin development (`*`).
+
+## Future Scalability
+*   **Scheduled Mock APIs:** Code exists (though commented out) to ingest data from secondary marketplace mock APIs.
+*   **ML Improvement:** The `train_ner.py` infrastructure allows for periodic model updates as procurement terminology evolves.
