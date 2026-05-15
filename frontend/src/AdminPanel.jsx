@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 const MARKET_SOURCES = [
     { value: 'IMPORT',  label: 'File Import (общий импорт)' },
     { value: 'MANUAL',  label: 'Manual (ручной ввод)' },
-    { value: 'KASPI',   label: 'Kaspi Market' },
-    { value: 'AMAZON',  label: 'Amazon Market' },
-    { value: 'API',     label: 'External API' },
-    { value: 'SYSTEM',  label: 'System Generated' },
+    { value: 'KASPI',   label: 'Kaspi.kz' },
+    { value: 'AMAZON',  label: 'Amazon Business' },
+    { value: 'API',     label: 'External API Sync' },
+    { value: 'SYSTEM',  label: 'Auto-Generated' },
 ];
 
 const AdminPanel = () => {
@@ -59,7 +59,7 @@ const AdminPanel = () => {
                 credentials: 'include',
             });
             if (response.ok) {
-                fetchUsers(); // Refresh list
+                fetchUsers();
             }
         } catch (err) {
             alert('Failed to update role');
@@ -74,7 +74,7 @@ const AdminPanel = () => {
                 credentials: 'include',
             });
             if (response.ok) {
-                fetchUsers(); // Refresh list
+                fetchUsers();
             }
         } catch (err) {
             alert('Failed to delete user');
@@ -148,310 +148,348 @@ const AdminPanel = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 pb-12">
-            <header>
-                <h1 className="text-3xl font-bold text-gray-800">Admin Control Panel</h1>
-                <p className="text-gray-600">Manage data ingestion and system settings</p>
+        <div className="max-w-6xl mx-auto space-y-10 pb-20 animate-in fade-in duration-700">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <span className="w-8 h-1 bg-indigo-600 rounded-full" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Administrative Suite</span>
+                    </div>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">System Control Center</h1>
+                </div>
+                
+                <div className="px-5 py-2.5 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center gap-3">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mainframe Active</span>
+                </div>
             </header>
 
-            {/* 1. Risk Settings */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-                    <h2 className="text-xl font-semibold text-gray-800 flex items-center">
-                        <span className="mr-2">⚙️</span> Personal Risk Settings
-                    </h2>
-                </div>
-                <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <label className="text-sm font-medium text-gray-700">
-                            High Risk Threshold (Deviation %)
-                        </label>
-                        <span className="px-3 py-1 bg-blue-100 text-blue-700 font-bold rounded-full">
-                            {threshold}%
-                        </span>
-                    </div>
-                    <input
-                        type="range"
-                        min="1"
-                        max="100"
-                        value={threshold}
-                        onChange={handleThresholdChange}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600 mb-4"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500">
-                        <span>Sensitive (1%)</span>
-                        <span>Lenient (100%)</span>
-                    </div>
-                </div>
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Side Controls */}
+                <div className="lg:col-span-1 space-y-8">
+                    {/* Risk Matrix Config */}
+                    <section className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-[0_1px_3px_rgba(0,0,0,0.05)] relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full blur-2xl -mr-16 -mt-16 opacity-50" />
+                        <div className="relative z-10 space-y-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
+                                    <span className="text-xl">⚙️</span>
+                                </div>
+                                <h2 className="text-xl font-black text-slate-900 tracking-tight">Risk Matrix</h2>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Threshold</label>
+                                    <span className="px-3 py-1 bg-indigo-50 text-indigo-600 font-black rounded-lg border border-indigo-100">{threshold}%</span>
+                                </div>
+                                <input
+                                    type="range" min="1" max="100"
+                                    value={threshold}
+                                    onChange={handleThresholdChange}
+                                    className="w-full accent-indigo-600 cursor-pointer"
+                                />
+                                <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">
+                                    Defines the percentage deviation required to flag an item as high risk.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
 
-            {/* 2. User Management */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-800 flex items-center">
-                        <span className="mr-2">👥</span> User Management
-                    </h2>
-                    <button 
-                        onClick={fetchUsers}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                        Refresh List
-                    </button>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase font-bold">
-                            <tr>
-                                <th className="px-6 py-3">ID</th>
-                                <th className="px-6 py-3">Username</th>
-                                <th className="px-6 py-3">Role</th>
-                                <th className="px-6 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {users.map(user => (
-                                <tr key={user.id} className="hover:bg-gray-50 transition-colors text-sm">
-                                    <td className="px-6 py-4 text-gray-400">{user.id}</td>
-                                    <td className="px-6 py-4 font-bold text-gray-800">{user.username}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                            user.role === 'ROLE_ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
-                                        }`}>
-                                            {user.role}
+                    {/* Environment Diagnostics */}
+                    <section className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-900/20">
+                        <div className="absolute bottom-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -mb-24 -mr-24" />
+                        <div className="relative z-10 space-y-6">
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Environment Diagnostics</h3>
+                            <div className="space-y-4">
+                                {[
+                                    { label: 'PostgreSQL Master', status: 'STABLE' },
+                                    { label: 'Python NLP Engine', status: 'READY' },
+                                    { label: 'System Cache', status: 'ACTIVE' }
+                                ].map((item, i) => (
+                                    <div key={i} className="flex items-center justify-between py-2 border-b border-white/5">
+                                        <span className="text-sm font-bold text-slate-400">{item.label}</span>
+                                        <span className="text-xs font-black text-emerald-400 flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {item.status}
                                         </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right space-x-2">
-                                        <button 
-                                            onClick={() => handleRoleChange(user.id, user.role === 'ROLE_ADMIN' ? 'ROLE_USER' : 'ROLE_ADMIN')}
-                                            className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
-                                        >
-                                            Switch Role
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDeleteUser(user.id)}
-                                            className="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded transition-colors"
-                                        >
-                                            Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {usersLoading && (
-                                <tr>
-                                    <td colSpan="4" className="px-6 py-8 text-center text-gray-400 italic">
-                                        Loading users...
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                {/* Main Content: User Identity */}
+                <div className="lg:col-span-2">
+                    <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col h-full">
+                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-2xl">
+                                    👥
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Identity Management</h2>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Authorized system operators</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={fetchUsers}
+                                className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+                            >
+                                Reload Directory
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="bg-slate-50/50">
+                                        <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Operator</th>
+                                        <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Level</th>
+                                        <th className="px-8 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Operations</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {users.map(user => (
+                                        <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
+                                            <td className="px-8 py-5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-400 border-2 border-white shadow-sm uppercase">
+                                                        {user.username.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-black text-slate-900">{user.username}</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">UUID: {user.id}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${
+                                                    user.role === 'ROLE_ADMIN' 
+                                                        ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' 
+                                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                }`}>
+                                                    {user.role?.replace('ROLE_', '')}
+                                                </span>
+                                            </td>
+                                            <td className="px-8 py-5 text-right">
+                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => handleRoleChange(user.id, user.role === 'ROLE_ADMIN' ? 'ROLE_USER' : 'ROLE_ADMIN')}
+                                                        className="px-4 py-1.5 bg-white border border-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-slate-50 transition-all shadow-sm"
+                                                    >
+                                                        Elevate
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm border border-rose-100"
+                                                    >
+                                                        Purge
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {usersLoading && (
+                                        <tr>
+                                            <td colSpan="3" className="px-8 py-12 text-center animate-pulse text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                                                Querying Identity Service...
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                 </div>
             </div>
 
-            {/* 3. Excel Import */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-                    <h2 className="text-xl font-semibold text-gray-800 flex items-center">
-                        <span className="mr-2">📊</span> Импорт Market Indicators из Excel
-                    </h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Загрузите .xlsx или .xls файл с данными о рыночных ценах. Ожидаемые колонки:
-                        <span className="ml-1 font-mono text-xs bg-gray-100 px-1 rounded">наименование / name</span>,{' '}
-                        <span className="font-mono text-xs bg-gray-100 px-1 rounded">цена / price</span>.
-                        Поддерживаются RU/KK/EN варианты.
-                    </p>
+            {/* Excel Data Ingestion */}
+            <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+                <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-emerald-50/20">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-emerald-100 flex items-center justify-center text-2xl">
+                            📥
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Data Matrix Ingestion</h2>
+                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">Import Market Indicators via Excel</p>
+                        </div>
+                    </div>
+                    <div className="bg-emerald-100/50 px-4 py-2 rounded-xl border border-emerald-200">
+                        <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Formats Supported: .xlsx, .xls</p>
+                    </div>
                 </div>
-                <div className="p-6">
-                    <form onSubmit={handleExcelImport} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Excel файл <span className="text-red-500">*</span>
-                                </label>
+
+                <div className="p-8">
+                    <form onSubmit={handleExcelImport} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Payload Selection</label>
+                            <div className="relative group">
                                 <input
                                     type="file"
                                     accept=".xlsx,.xls"
                                     onChange={(e) => { setExcelFile(e.target.files[0]); setExcelResult(null); setExcelError(null); }}
-                                    className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-gray-300 rounded-lg p-2"
+                                    className="hidden"
+                                    id="excel-upload"
                                 />
-                                {excelFile && (
-                                    <p className="text-xs text-gray-500 mt-1">{excelFile.name} — {(excelFile.size / 1024).toFixed(1)} KB</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Источник данных (MarketSource)
+                                <label 
+                                    htmlFor="excel-upload"
+                                    className="flex items-center justify-center gap-4 w-full h-32 border-2 border-dashed border-slate-200 rounded-3xl hover:border-emerald-500 hover:bg-emerald-50/30 transition-all cursor-pointer group"
+                                >
+                                    <span className="text-3xl transition-transform group-hover:scale-125">📂</span>
+                                    <div className="text-left">
+                                        <p className="text-sm font-black text-slate-900">{excelFile ? excelFile.name : 'Choose Data File'}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">{excelFile ? `${(excelFile.size / 1024).toFixed(1)} KB` : 'Click to browse mainframe'}</p>
+                                    </div>
                                 </label>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="space-y-4">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Market Origin</label>
                                 <select
                                     value={excelSource}
                                     onChange={(e) => setExcelSource(e.target.value)}
-                                    className="w-full p-2.5 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none transition-all appearance-none cursor-pointer"
                                 >
                                     {MARKET_SOURCES.map(s => (
                                         <option key={s.value} value={s.value}>{s.label}</option>
                                     ))}
                                 </select>
                             </div>
-                        </div>
 
-                        <button
-                            type="submit"
-                            disabled={excelLoading || !excelFile}
-                            className={`w-full py-3 px-4 rounded-lg font-bold text-white shadow-lg transition-all ${
-                                excelLoading || !excelFile
-                                    ? 'bg-green-300 cursor-not-allowed'
-                                    : 'bg-green-600 hover:bg-green-700 active:transform active:scale-[0.98] shadow-green-500/20'
-                            }`}
-                        >
-                            {excelLoading ? 'Импортируем данные...' : '📥 Загрузить и импортировать'}
-                        </button>
+                            <button
+                                type="submit"
+                                disabled={excelLoading || !excelFile}
+                                className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black rounded-2xl shadow-xl shadow-emerald-600/30 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-3"
+                            >
+                                {excelLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><span>EXECUTE IMPORT</span> <span className="text-xl">📥</span></>}
+                            </button>
+                        </div>
                     </form>
 
                     {excelError && (
-                        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                            <p className="font-bold">Ошибка импорта</p>
-                            <p>{excelError}</p>
+                        <div className="mt-8 p-6 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-4 text-rose-600 animate-shake">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                                <p className="font-black uppercase text-[10px] tracking-widest mb-1 text-rose-400">Ingestion Failure</p>
+                                <p className="font-bold text-sm">{excelError}</p>
+                            </div>
                         </div>
                     )}
 
                     {excelResult && (
-                        <div className="mt-4 space-y-3">
-                            <div className={`p-4 rounded-lg border text-sm ${
-                                excelResult.skipped === 0
-                                    ? 'bg-green-50 border-green-200 text-green-800'
-                                    : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                        <div className="mt-8 animate-in slide-in-from-top-4">
+                            <div className={`p-8 rounded-[2rem] border grid grid-cols-1 md:grid-cols-3 gap-8 ${
+                                excelResult.skipped === 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'
                             }`}>
-                                <p className="font-bold mb-1">
-                                    {excelResult.skipped === 0 ? 'Импорт завершён успешно' : 'Импорт завершён с предупреждениями'}
-                                </p>
-                                <div className="flex gap-4">
-                                    <span>Всего строк: <strong>{excelResult.total}</strong></span>
-                                    <span className="text-green-700">Сохранено: <strong>{excelResult.saved}</strong></span>
-                                    {excelResult.skipped > 0 && (
-                                        <span className="text-yellow-700">Пропущено: <strong>{excelResult.skipped}</strong></span>
-                                    )}
+                                <div className="space-y-1 text-center md:text-left">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PROCESSED</p>
+                                    <p className="text-3xl font-black text-slate-900">{excelResult.total}</p>
+                                </div>
+                                <div className="space-y-1 text-center md:text-left">
+                                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">SAVED</p>
+                                    <p className="text-3xl font-black text-emerald-600">{excelResult.saved}</p>
+                                </div>
+                                <div className="space-y-1 text-center md:text-left">
+                                    <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">EXCLUDED</p>
+                                    <p className="text-3xl font-black text-rose-400">{excelResult.skipped}</p>
                                 </div>
                             </div>
-                            {excelResult.errors && excelResult.errors.length > 0 && (
-                                <details className="text-xs">
-                                    <summary className="cursor-pointer text-gray-500 hover:text-gray-700 font-medium">
-                                        Показать предупреждения ({excelResult.errors.length})
-                                    </summary>
-                                    <ul className="mt-2 space-y-1 bg-gray-50 rounded p-3 max-h-40 overflow-y-auto">
-                                        {excelResult.errors.map((err, i) => (
-                                            <li key={i} className="text-yellow-700">{err}</li>
-                                        ))}
-                                    </ul>
-                                </details>
-                            )}
                         </div>
                     )}
                 </div>
 
-                {/* Expected format hint */}
-                <div className="px-6 pb-6">
-                    <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-600">
-                        <p className="font-semibold mb-2 text-gray-700">Поддерживаемые форматы заголовков колонок:</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <div>
-                                <span className="font-medium">Наименование (RU):</span>{' '}
-                                наименование, название_ру, item_name_ru, name_ru
-                            </div>
-                            <div>
-                                <span className="font-medium">Наименование (KK):</span>{' '}
-                                атауы, наименование_қаз, item_name_kk, name_kk
-                            </div>
-                            <div>
-                                <span className="font-medium">Наименование (EN):</span>{' '}
-                                name, product, item_name_en, name_en
-                            </div>
-                            <div>
-                                <span className="font-medium">Цена:</span>{' '}
-                                цена, стоимость, price, baseline_price, unit_price
-                            </div>
+                <div className="px-8 pb-8">
+                    <div className="bg-slate-50 rounded-[2rem] p-6 text-[10px] text-slate-500 border border-slate-100">
+                        <p className="font-black mb-3 text-slate-700 uppercase tracking-widest">Поддерживаемые форматы заголовков:</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                                { label: 'Наименование (RU)', content: 'наименование, название_ру, item_name_ru, name_ru' },
+                                { label: 'Наименование (KK)', content: 'атауы, наименование_қаз, item_name_kk, name_kk' },
+                                { label: 'Наименование (EN)', content: 'name, product, item_name_en, name_en' },
+                                { label: 'Цена', content: 'цена, стоимость, price, baseline_price, unit_price' }
+                            ].map((item, i) => (
+                                <div key={i}>
+                                    <span className="font-black text-slate-400 uppercase tracking-tighter">{item.label}:</span><br/>
+                                    <span className="font-mono text-indigo-400">{item.content}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            {/* 4. Scraper Trigger */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-                    <h2 className="text-xl font-semibold text-gray-800 flex items-center">
-                        <span className="mr-2">🕷️</span> Goszakup Scraper Trigger
-                    </h2>
-                </div>
+            {/* Scraper Control Engine */}
+            <section className="bg-slate-900 rounded-[2.5rem] overflow-hidden relative shadow-2xl shadow-indigo-900/40">
+                <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_70%_0%,rgba(79,70,229,0.1)_0%,transparent_50%)]" />
                 
-                <div className="p-6">
-                    <form onSubmit={handleTriggerScraper}>
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Goszakup Session Cookie (Optional)
-                            </label>
-                            <textarea
-                                className="w-full h-32 p-3 text-sm font-mono bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                                placeholder="ci_session=... (Paste your session cookie here to bypass bot protection)"
-                                value={cookie}
-                                onChange={(e) => setCookie(e.target.value)}
-                            />
+                <div className="p-10 relative z-10 flex flex-col lg:flex-row gap-12">
+                    <div className="lg:w-1/3 space-y-6">
+                        <div className="w-14 h-14 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-600/30 flex items-center justify-center text-3xl">
+                            🕷️
                         </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className={`w-full py-3 px-4 rounded-lg font-bold text-white shadow-lg shadow-blue-500/20 transition-all ${
-                                loading 
-                                ? 'bg-blue-400 cursor-not-allowed' 
-                                : 'bg-blue-600 hover:bg-blue-700 active:transform active:scale-[0.98]'
-                            }`}
-                        >
-                            {loading ? 'Running Scraper Tasks...' : '🚀 Start Data Ingestion'}
-                        </button>
-                    </form>
-
-                    {error && (
-                        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                            <p className="font-bold">Error Occurred</p>
-                            <p>{error}</p>
+                        <div className="space-y-2">
+                            <h2 className="text-3xl font-black text-white tracking-tight">Scraper Engine</h2>
+                            <p className="text-indigo-300/80 text-sm font-medium leading-relaxed">
+                                Deploy autonomous crawlers to harvest real-time procurement data from the Goszakup national registry.
+                            </p>
                         </div>
-                    )}
-
-                    {result && (
-                        <div className={`mt-6 p-4 rounded-lg text-sm ${
-                            result.status === 'success' 
-                            ? 'bg-green-50 border border-green-200 text-green-700' 
-                            : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
-                        }`}>
-                            <p className="font-bold">{result.status === 'success' ? 'Scraper Completed' : 'Scraper Warning'}</p>
-                            <p>{result.status === 'success' ? `Successfully parsed and saved ${result.count} lots.` : result.message}</p>
+                        <div className="p-6 bg-white/5 border border-white/10 rounded-3xl space-y-4">
+                            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Operational Protocol</h4>
+                            <ul className="space-y-3">
+                                {[
+                                    'Bypass captcha manually if required',
+                                    'Paste `ci_session` from browser cookies',
+                                    'Trigger synchronous data ingestion'
+                                ].map((item, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-xs font-bold text-slate-400">
+                                        <span className="text-emerald-400 text-base">✔</span> {item}
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
-                    )}
-                </div>
-            </div>
-
-            {/* 4. Footer info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-xl border border-gray-200">
-                    <h3 className="font-bold text-gray-800 mb-2">Instructions</h3>
-                    <ul className="text-sm text-gray-600 space-y-2 list-disc ml-4">
-                        <li>Go to goszakup.gov.kz and solve the captcha.</li>
-                        <li>Open DevTools (F12) → Application → Cookies.</li>
-                        <li>Copy the value of <code>ci_session</code>.</li>
-                        <li>Paste it above to ensure the scraper can access protected pages.</li>
-                    </ul>
-                </div>
-                <div className="bg-white p-6 rounded-xl border border-gray-200">
-                    <h3 className="font-bold text-gray-800 mb-2">System Status</h3>
-                    <div className="flex justify-between items-center text-sm py-1 border-b border-gray-100">
-                        <span className="text-gray-600">PostgreSQL</span>
-                        <span className="text-green-600 font-bold">Online</span>
                     </div>
-                    <div className="flex justify-between items-center text-sm py-1">
-                        <span className="text-gray-600">NLP Service</span>
-                        <span className="text-green-600 font-bold">Online</span>
+
+                    <div className="lg:w-2/3">
+                        <form onSubmit={handleTriggerScraper} className="space-y-8">
+                            <div className="space-y-4">
+                                <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">Authentication Cookie Payload</label>
+                                <textarea
+                                    className="w-full h-40 p-6 bg-white/5 border border-white/10 rounded-[2rem] text-white font-mono text-sm placeholder:text-slate-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all leading-relaxed"
+                                    placeholder="PASTE SESSION IDENTIFIER: ci_session=... (Required for restricted data access)"
+                                    value={cookie}
+                                    onChange={(e) => setCookie(e.target.value)}
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-6 bg-white text-indigo-900 font-black rounded-[2rem] shadow-2xl shadow-white/10 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50 flex items-center justify-center gap-4 text-lg"
+                            >
+                                {loading ? <div className="w-6 h-6 border-2 border-indigo-900/30 border-t-indigo-900 rounded-full animate-spin" /> : <><span>INITIALIZE DATA HARVEST</span> 🚀</>}
+                            </button>
+                        </form>
+
+                        {result && (
+                            <div className={`mt-8 p-8 rounded-[2rem] border animate-in slide-in-from-bottom-4 ${
+                                result.status === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                            }`}>
+                                <p className="font-black text-lg mb-2 uppercase tracking-tight">{result.status === 'success' ? 'Engine Complete' : 'Engine Alert'}</p>
+                                <p className="font-bold text-sm leading-relaxed">{result.status === 'success' ? `Extraction successful. Captured ${result.count} data entities.` : result.message}</p>
+                            </div>
+                        )}
+                        {error && (
+                            <div className="mt-8 p-6 bg-rose-500/10 border border-rose-500/20 rounded-[2rem] text-rose-400 animate-shake">
+                                <p className="font-black text-[10px] uppercase tracking-widest mb-1">System Error</p>
+                                <p className="font-bold text-sm">{error}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     );
 };

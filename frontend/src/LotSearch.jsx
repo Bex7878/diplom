@@ -34,9 +34,9 @@ const LotSearch = () => {
             if (!response.ok) throw new Error('Failed to fetch historical lots');
 
             const data = await response.json();
-            setLots(data.content);
-            setTotalPages(data.totalPages);
-            setTotalElements(data.totalElements);
+            setLots(data.content || []);
+            setTotalPages(data.totalPages || 0);
+            setTotalElements(data.totalElements || 0);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -53,7 +53,7 @@ const LotSearch = () => {
         if (page === 0) {
             fetchLots(0, pageSize, query);
         } else {
-            setPage(0); // triggers useEffect
+            setPage(0);
         }
     };
 
@@ -66,21 +66,40 @@ const LotSearch = () => {
     const to = Math.min((page + 1) * pageSize, totalElements);
 
     return (
-        <div className="max-w-6xl mx-auto">
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-800">Historical Lots Database</h1>
-                <p className="text-gray-600">Search and browse previously parsed procurement lots from Goszakup</p>
+        <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-700">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <span className="w-8 h-1 bg-emerald-500 rounded-full" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Procurement Repository</span>
+                    </div>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">Historical Data Suite</h1>
+                </div>
+                
+                {totalElements > 0 && (
+                    <div className="px-6 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-4 shadow-sm">
+                        <div className="text-right">
+                            <p className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest leading-none mb-1 text-xs">Total Records</p>
+                            <p className="text-xl font-black text-emerald-600 leading-none">{totalElements.toLocaleString()}</p>
+                        </div>
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-xl border border-emerald-50">
+                            📊
+                        </div>
+                    </div>
+                )}
             </header>
 
             {/* Search Box */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-                <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
-                    <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-[0_1px_3px_rgba(0,0,0,0.05)] relative group overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
+                
+                <form onSubmit={handleSearch} className="relative z-10 flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-1 group">
+                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors text-xl">🔍</span>
                         <input
                             type="text"
-                            className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                            placeholder="Search by Lot ID, Customer BIN, or Item Name..."
+                            className="w-full pl-16 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 transition-all font-bold"
+                            placeholder="SEARCH BY LOT ID, CUSTOMER BIN, OR ITEM NAME..."
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
@@ -88,71 +107,109 @@ const LotSearch = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all disabled:bg-blue-300"
+                        className="px-12 py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-[2rem] shadow-xl shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
                     >
-                        {loading ? 'Searching...' : 'Search Records'}
+                        {loading ? (
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                            <><span>QUERY RECORDS</span> 🚀</>
+                        )}
                     </button>
                 </form>
-                {totalElements > 0 && (
-                    <p className="mt-3 text-sm text-gray-500 font-medium">
-                        Showing <span className="text-blue-600 font-bold">{from}–{to}</span> of{' '}
-                        <span className="text-blue-600 font-bold">{totalElements.toLocaleString()}</span> results
+                <div className="mt-6 flex items-center justify-between px-6">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                        Showing results <span className="text-slate-900">{from}–{to}</span>
                     </p>
-                )}
+                    <div className="flex items-center gap-4">
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Rows per page:</span>
+                        <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 shadow-inner">
+                            {PAGE_SIZE_OPTIONS.map((opt) => (
+                                <button
+                                    key={opt}
+                                    onClick={() => handlePageSizeChange(opt)}
+                                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${
+                                        pageSize === opt ? 'bg-white text-emerald-600 shadow-sm border border-emerald-50' : 'text-slate-400 hover:text-slate-600'
+                                    }`}
+                                >
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {error && (
-                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-md mb-8 flex items-center">
-                    <span className="mr-3 text-xl">⚠️</span>
-                    <p className="font-medium">{error}</p>
+                <div className="p-6 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-4 text-rose-600 animate-in shake duration-500">
+                    <span className="text-2xl">⚠️</span>
+                    <p className="font-bold">{error}</p>
                 </div>
             )}
 
             {/* Results Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden animate-in slide-in-from-bottom-8 duration-1000">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wider w-10">#</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Lot ID</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Customer</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Item Name / Specification</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Quantity</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price/Unit</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Total Sum</th>
+                    <table className="min-w-full divide-y divide-slate-100">
+                        <thead>
+                            <tr className="bg-slate-50/50">
+                                <th className="px-6 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-12">#</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Identifier</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Consumer (BIN)</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Specification</th>
+                                <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</th>
+                                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Price</th>
+                                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Valuation</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-100">
+                        <tbody className="divide-y divide-slate-50">
                             {lots.map((lot, index) => (
-                                <tr key={lot.id} className="hover:bg-blue-50/30 transition-colors">
-                                    <td className="px-4 py-4 text-center text-xs font-mono text-gray-400">{page * pageSize + index + 1}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">{lot.lotId}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs">{lot.customerBin}</span>
+                                <tr key={lot.id || index} className="hover:bg-slate-50/50 transition-colors group">
+                                    <td className="px-6 py-6 text-center text-[10px] font-black text-slate-300 font-mono italic">
+                                        {page * pageSize + index + 1}
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <p className="text-sm font-semibold text-gray-900 line-clamp-1">{lot.truName}</p>
-                                        <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{lot.description || 'No additional description'}</p>
+                                    <td className="px-8 py-6 whitespace-nowrap">
+                                        <span className="text-sm font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
+                                            {lot.lotId}
+                                        </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-center">
-                                        <span className="font-bold text-gray-800">{lot.quantity}</span>{' '}
-                                        <span className="text-xs">{lot.unit}</span>
+                                    <td className="px-8 py-6 whitespace-nowrap">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-700 font-mono tracking-tight">{lot.customerBin || '---'}</span>
+                                        </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{lot.unitPrice?.toLocaleString()} KZT</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <div className="text-sm font-black text-slate-800 bg-slate-100 px-2 py-1 rounded-md inline-block">
-                                            {lot.totalSum?.toLocaleString()} KZT
+                                    <td className="px-8 py-6 max-w-xs">
+                                        <p className="text-sm font-black text-slate-900 line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                                            {lot.truName || 'Unnamed Entity'}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 font-bold line-clamp-1 mt-1 italic uppercase tracking-tighter">
+                                            {lot.description || 'No detailed specification data available'}
+                                        </p>
+                                    </td>
+                                    <td className="px-8 py-6 whitespace-nowrap text-center">
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-sm font-black text-slate-800 leading-none">{lot.quantity || 0}</span>
+                                            <span className="text-[9px] font-black text-slate-400 uppercase mt-1 tracking-widest">{lot.unit || 'units'}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-6 whitespace-nowrap text-right">
+                                        <span className="text-sm font-black text-slate-900">{Number(lot.unitPrice || 0).toLocaleString()}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 ml-1.5 uppercase">KZT</span>
+                                    </td>
+                                    <td className="px-8 py-6 whitespace-nowrap text-right">
+                                        <div className="text-sm font-black text-indigo-600 bg-white border border-slate-100 px-4 py-2 rounded-xl inline-block shadow-sm group-hover:shadow-indigo-500/10 group-hover:border-indigo-100 transition-all">
+                                            {Number(lot.totalSum || 0).toLocaleString()} <span className="text-[9px] text-slate-300 font-bold ml-1">KZT</span>
                                         </div>
                                     </td>
                                 </tr>
                             ))}
                             {lots.length === 0 && !loading && (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-20 text-center text-gray-400">
-                                        <div className="text-4xl mb-2">📁</div>
-                                        <p className="text-lg font-bold italic">No records found</p>
-                                        <p className="text-sm">Try searching with different keywords or check the admin panel to trigger a new scrape.</p>
+                                    <td colSpan="7" className="px-6 py-32 text-center animate-in fade-in duration-1000">
+                                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                            <span className="text-4xl opacity-50">📁</span>
+                                        </div>
+                                        <h3 className="text-xl font-black text-slate-900 tracking-tight italic">Registry Empty</h3>
+                                        <p className="text-slate-400 text-sm font-medium mt-2 max-w-xs mx-auto">No records found matching your search criteria. Check your filters or try a broader search.</p>
                                     </td>
                                 </tr>
                             )}
@@ -162,66 +219,46 @@ const LotSearch = () => {
 
                 {/* Pagination Footer */}
                 {totalElements > 0 && (
-                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        {/* Page size selector */}
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span className="font-medium">Rows per page:</span>
-                            <div className="flex gap-1">
-                                {PAGE_SIZE_OPTIONS.map((opt) => (
-                                    <button
-                                        key={opt}
-                                        onClick={() => handlePageSizeChange(opt)}
-                                        className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                                            pageSize === opt
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-white text-gray-600 border border-gray-200 hover:border-blue-400 hover:text-blue-600'
-                                        }`}
-                                    >
-                                        {opt}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Page controls */}
-                        <div className="flex items-center gap-1">
+                    <div className="px-8 py-6 border-t border-slate-100 bg-slate-50/30 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-1.5 order-2 md:order-1">
                             <button
                                 onClick={() => setPage(0)}
                                 disabled={page === 0}
-                                className="px-2 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-indigo-600 hover:border-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
                             >
                                 «
                             </button>
                             <button
-                                onClick={() => setPage((p) => p - 1)}
+                                onClick={() => setPage((p) => Math.max(0, p - 1))}
                                 disabled={page === 0}
-                                className="px-3 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="px-5 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-[10px] font-black text-slate-400 hover:text-indigo-600 hover:border-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all uppercase tracking-widest shadow-sm"
                             >
-                                ‹ Prev
+                                Prev
                             </button>
 
-                            <PageNumbers page={page} totalPages={totalPages} onPageChange={setPage} />
+                            <div className="flex items-center gap-1.5 mx-3">
+                                <PageNumbers page={page} totalPages={totalPages} onPageChange={setPage} />
+                            </div>
 
                             <button
-                                onClick={() => setPage((p) => p + 1)}
+                                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                                 disabled={page >= totalPages - 1}
-                                className="px-3 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="px-5 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-[10px] font-black text-slate-400 hover:text-indigo-600 hover:border-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all uppercase tracking-widest shadow-sm"
                             >
-                                Next ›
+                                Next
                             </button>
                             <button
                                 onClick={() => setPage(totalPages - 1)}
                                 disabled={page >= totalPages - 1}
-                                className="px-2 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:border-blue-400 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="w-10 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-indigo-600 hover:border-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
                             >
                                 »
                             </button>
                         </div>
 
-                        <span className="text-xs text-gray-500 font-medium">
-                            Page <span className="font-bold text-gray-700">{page + 1}</span> of{' '}
-                            <span className="font-bold text-gray-700">{totalPages}</span>
-                        </span>
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] order-1 md:order-2 bg-white px-4 py-2 rounded-full border border-slate-100 shadow-sm">
+                            Page <span className="text-slate-900">{page + 1}</span> of <span className="text-slate-900">{totalPages}</span>
+                        </div>
                     </div>
                 )}
             </div>
@@ -231,7 +268,7 @@ const LotSearch = () => {
 
 const PageNumbers = ({ page, totalPages, onPageChange }) => {
     const pages = [];
-    const delta = 2;
+    const delta = 1;
     const left = Math.max(0, page - delta);
     const right = Math.min(totalPages - 1, page + delta);
 
@@ -249,15 +286,15 @@ const PageNumbers = ({ page, totalPages, onPageChange }) => {
         <>
             {pages.map((p, i) =>
                 p === '...' ? (
-                    <span key={`ellipsis-${i}`} className="px-2 text-gray-400 text-xs">…</span>
+                    <span key={`ellipsis-${i}`} className="px-2 text-slate-300 font-black">…</span>
                 ) : (
                     <button
                         key={p}
                         onClick={() => onPageChange(p)}
-                        className={`min-w-[28px] px-2 py-1 text-xs rounded border transition-all ${
+                        className={`min-w-[40px] h-10 px-3 rounded-xl text-xs font-black transition-all ${
                             p === page
-                                ? 'bg-blue-600 text-white border-blue-600 font-bold'
-                                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-110 border border-indigo-500'
+                                : 'bg-white text-slate-400 border border-slate-100 hover:bg-slate-50 shadow-sm'
                         }`}
                     >
                         {p + 1}
