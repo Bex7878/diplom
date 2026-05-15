@@ -8,6 +8,7 @@ const Register = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -20,6 +21,7 @@ const Register = () => {
             return;
         }
 
+        setIsLoading(true);
         try {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
             const response = await axios.post(`${apiUrl}/api/auth/register`, {
@@ -34,61 +36,121 @@ const Register = () => {
             }
         } catch (err) {
             setError(err.response?.data || 'Registration failed. Username might be taken.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-            <div className="px-8 py-6 mt-4 text-left bg-white shadow-lg rounded-lg w-96">
-                <h3 className="text-2xl font-bold text-center">Create an account</h3>
-                <form onSubmit={handleSubmit}>
-                    <div className="mt-4">
-                        <div>
-                            <label className="block" htmlFor="username">Username</label>
-                            <input 
-                                type="text" 
-                                placeholder="Username"
-                                className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                required
-                            />
+        <div className="min-h-screen flex items-center justify-center bg-[#0F172A] relative overflow-hidden font-sans">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-600/10 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
+
+            <div className="w-full max-w-md p-8 relative z-10 animate-in fade-in zoom-in duration-700">
+                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
+                    <div className="text-center mb-10">
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-600 rounded-2xl shadow-lg shadow-emerald-600/30 mb-6 group transition-transform hover:scale-110">
+                            <span className="text-2xl font-black text-white">D</span>
                         </div>
-                        <div className="mt-4">
-                            <label className="block">Password</label>
-                            <input 
-                                type="password" 
-                                placeholder="Password"
-                                className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="mt-4">
-                            <label className="block">Confirm Password</label>
-                            <input 
-                                type="password" 
-                                placeholder="Confirm Password"
-                                className="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="flex flex-col items-center justify-between">
-                            <button className="w-full px-6 py-2 mt-4 text-white bg-green-600 rounded-lg hover:bg-green-700">Register</button>
-                            <div className="mt-4 text-grey-dark">
-                                Already have an account? 
-                                <Link to="/login" className="text-blue-600 hover:underline ml-1">
-                                    Log in
-                                </Link>
+                        <h2 className="text-3xl font-black text-white tracking-tight mb-2">Create Account</h2>
+                        <p className="text-slate-400 text-sm font-medium">Join the Deviator.ai Analytical Community</p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <div className="space-y-2">
+                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1" htmlFor="username">
+                                Username
+                            </label>
+                            <div className="relative group">
+                                <input 
+                                    type="text" 
+                                    id="username"
+                                    placeholder="Choose a username"
+                                    className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all group-hover:border-white/20"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    required
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-emerald-500 transition-colors">👤</span>
                             </div>
                         </div>
-                        {error && <p className="text-red-500 text-sm mt-2 text-center">{error}</p>}
-                        {success && <p className="text-green-500 text-sm mt-2 text-center">{success}</p>}
-                    </div>
-                </form>
+
+                        <div className="space-y-2">
+                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+                                Password
+                            </label>
+                            <div className="relative group">
+                                <input 
+                                    type="password" 
+                                    placeholder="Create a password"
+                                    className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all group-hover:border-white/20"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-emerald-500 transition-colors">🔒</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+                                Confirm Password
+                            </label>
+                            <div className="relative group">
+                                <input 
+                                    type="password" 
+                                    placeholder="Confirm your password"
+                                    className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all group-hover:border-white/20"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    required
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-emerald-500 transition-colors">✔️</span>
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                <span>⚠️</span>
+                                {error}
+                            </div>
+                        )}
+
+                        {success && (
+                            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold p-4 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                <span>🎉</span>
+                                {success}
+                            </div>
+                        )}
+
+                        <button 
+                            disabled={isLoading}
+                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isLoading ? (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <span>Create Account</span>
+                                    <span className="text-lg">→</span>
+                                </>
+                            )}
+                        </button>
+
+                        <div className="pt-6 text-center border-t border-white/5">
+                            <p className="text-slate-500 text-sm">
+                                Already have an account? 
+                                <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-bold ml-2 transition-colors">
+                                    Sign in instead
+                                </Link>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+                <p className="text-center mt-8 text-slate-600 text-xs font-bold uppercase tracking-widest">
+                    Deviator.ai &copy; 2026
+                </p>
             </div>
         </div>
     );
