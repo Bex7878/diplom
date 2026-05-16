@@ -48,14 +48,38 @@ const TopRisks = () => {
                 backgroundColor: '#F8FAFC',
                 logging: false,
                 onclone: (clonedDoc) => {
-                    // Ensure hidden elements remain hidden in export
                     const clonedEl = clonedDoc.querySelector('[data-report-container]');
                     if (clonedEl) {
-                        clonedEl.style.padding = '20px';
+                        // Stabilize layout for export
+                        clonedEl.style.width = '1024px';
+                        clonedEl.style.padding = '40px';
+                        clonedEl.style.backgroundColor = '#F8FAFC';
                     }
+                    
+                    // Remove all animations and transitions
+                    const style = clonedDoc.createElement('style');
+                    style.innerHTML = `
+                        * { 
+                            animation: none !important; 
+                            transition: none !important; 
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        .premium-card { 
+                            background-color: #ffffff !important; 
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+                            margin-bottom: 20px !important;
+                        }
+                        .bg-rose-50 { background-color: #fff1f2 !important; }
+                        .bg-amber-50 { background-color: #fffbeb !important; }
+                        .text-slate-900 { color: #0f172a !important; }
+                        .text-slate-400 { color: #94a3b8 !important; }
+                        footer { background-color: #312e81 !important; color: white !important; }
+                    `;
+                    clonedDoc.head.appendChild(style);
                 }
             });
-            const imgData = canvas.toDataURL('image/png');
+            const imgData = canvas.toDataURL('image/png', 1.0);
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();

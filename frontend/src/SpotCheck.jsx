@@ -323,8 +323,32 @@ const SpotCheck = () => {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
+                logging: false,
+                onclone: (clonedDoc) => {
+                    const clonedEl = clonedDoc.querySelector('[data-export-container]');
+                    if (clonedEl) {
+                        clonedEl.style.padding = '20px';
+                        clonedEl.style.backgroundColor = '#ffffff';
+                    }
+                    // Remove all animations and transitions
+                    const style = clonedDoc.createElement('style');
+                    style.innerHTML = `
+                        * { 
+                            animation: none !important; 
+                            transition: none !important; 
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+                        .bg-rose-50\\/30 { background-color: #fff1f2 !important; }
+                        .bg-emerald-50\\/30 { background-color: #ecfdf5 !important; }
+                        .bg-slate-50\\/50 { background-color: #f8fafc !important; }
+                        .border-rose-200 { border-color: #fecdd3 !important; }
+                        .border-emerald-200 { border-color: #a7f3d0 !important; }
+                    `;
+                    clonedDoc.head.appendChild(style);
+                }
             });
-            const imgData = canvas.toDataURL('image/png');
+            const imgData = canvas.toDataURL('image/png', 1.0);
             const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
@@ -616,7 +640,7 @@ const SpotCheck = () => {
                             {exporting ? <LoadingSpinner label="EXPORTING..." /> : <><span>SAVE AS PDF</span> 📄</>}
                         </button>
                     </div>
-                    <div ref={lotResultRef}>
+                    <div ref={lotResultRef} data-export-container>
                         <LotResultCard result={lotResult} />
                     </div>
                 </div>
@@ -648,7 +672,7 @@ const SpotCheck = () => {
                         </button>
                     </div>
 
-                    <div ref={textResultsRef} className="space-y-8">
+                    <div ref={textResultsRef} data-export-container className="space-y-8">
                     {results.map((result, index) => {
                         const isHighRisk = result?.isHighRisk;
                         const sourceLabel = result?.marketSource === 'market_indicator'
