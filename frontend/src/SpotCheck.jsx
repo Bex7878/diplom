@@ -3,8 +3,8 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
+import { useTranslation } from 'react-i18next';
 
-// Use a more robust way to set the worker for pdfjs-dist 5.x
 try {
     const workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
     pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
@@ -12,7 +12,7 @@ try {
     console.error('Failed to set pdf.js worker:', e);
 }
 
-/* ── Sub-components (Updated with minimal Deviator style) ── */
+/* ── Sub-components ── */
 
 const LoadingSpinner = ({ label }) => (
     <span className="flex items-center justify-center">
@@ -24,13 +24,13 @@ const LoadingSpinner = ({ label }) => (
     </span>
 );
 
-const RiskBadge = ({ isHighRisk }) => (
+const RiskBadge = ({ isHighRisk, t }) => (
     <span className={`px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${
-        isHighRisk 
-            ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' 
+        isHighRisk
+            ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
             : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
     }`}>
-        {isHighRisk ? '🚩 High Risk' : '✅ Compliant'}
+        {isHighRisk ? `🚩 ${t('spotCheck.highRisk')}` : `✅ ${t('spotCheck.compliant')}`}
     </span>
 );
 
@@ -41,26 +41,17 @@ const StatBox = ({ label, value }) => (
     </div>
 );
 
-const SOURCE_LABELS = {
-    MANUAL: 'Manual Input',
-    API: 'External API',
-    IMPORT: 'File Import',
-    SYSTEM: 'System',
-    AMAZON: 'Amazon',
-    KASPI: 'Kaspi',
-};
-
-const IndicatorsTable = ({ indicators }) => (
+const IndicatorsTable = ({ indicators, t }) => (
     <div className="px-8 pb-8 animate-in fade-in duration-500">
         <div className="bg-slate-50/50 rounded-2xl border border-slate-100 overflow-hidden">
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/50">
                         <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">#</th>
-                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Source</th>
+                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('spotCheck.source')}</th>
                         <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Price (KZT)</th>
-                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Deviation</th>
-                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Risk</th>
+                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{t('spotCheck.deviation')}</th>
+                        <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">{t('spotCheck.risk')}</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -69,7 +60,7 @@ const IndicatorsTable = ({ indicators }) => (
                             <td className="px-6 py-3 text-slate-300 font-mono text-[10px] font-black">{i + 1}</td>
                             <td className="px-6 py-3">
                                 <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold rounded border border-indigo-100">
-                                    {SOURCE_LABELS[ind.source] || ind.source}
+                                    {t(`spotCheck.sourceLabels.${ind.source}`) || ind.source}
                                 </span>
                             </td>
                             <td className="px-6 py-3 text-right font-black text-slate-900 text-sm">
@@ -91,25 +82,25 @@ const IndicatorsTable = ({ indicators }) => (
     </div>
 );
 
-const DeviationBox = ({ deviation, isHighRisk }) => (
+const DeviationBox = ({ deviation, isHighRisk, t }) => (
     <div className={`p-4 rounded-2xl border transition-all duration-300 ${
-        isHighRisk 
-            ? 'bg-rose-50 border-rose-100 hover:bg-rose-100/50' 
+        isHighRisk
+            ? 'bg-rose-50 border-rose-100 hover:bg-rose-100/50'
             : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100/50'
     }`}>
-        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 opacity-60">Price Deviation</p>
+        <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5 opacity-60">{t('spotCheck.priceDeviation')}</p>
         <p className={`text-2xl font-black leading-none ${isHighRisk ? 'text-rose-600' : 'text-emerald-600'}`}>
             {(deviation || 0) > 0 ? '+' : ''}{(deviation || 0).toFixed(1)}%
         </p>
     </div>
 );
 
-const LotResultCard = ({ result }) => {
+const LotResultCard = ({ result, t }) => {
     if (!result) return null;
     const isHighRisk = result.isHighRisk;
     const sourceLabel = result.marketSource === 'market_indicator'
-        ? '📊 Market Indicator'
-        : '📈 Historical Average';
+        ? `📊 ${t('spotCheck.marketMatrix')}`
+        : `📈 ${t('spotCheck.historyAnalysis')}`;
 
     return (
         <div className={`bg-white rounded-3xl shadow-[0_1px_3px_rgba(0,0,0,0.05),0_10px_15px_-5px_rgba(0,0,0,0.02)] border overflow-hidden transition-all duration-300 hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.04)] ${
@@ -128,24 +119,24 @@ const LotResultCard = ({ result }) => {
                         )}
                     </div>
                 </div>
-                <RiskBadge isHighRisk={isHighRisk} />
+                <RiskBadge isHighRisk={isHighRisk} t={t} />
             </div>
 
             <div className="p-8 grid grid-cols-2 md:grid-cols-4 gap-6 bg-white">
-                <StatBox label="Lot Unit Price" value={`${Number(result.unitPrice || 0).toLocaleString()} KZT`} />
-                <StatBox label="Market Baseline" value={`${(result.marketPrice || 0).toLocaleString()} KZT`} />
-                <StatBox label="Quantity" value={`${Number(result.quantity || 0).toLocaleString()} ${result.unit || 'ед.'}`} />
-                <DeviationBox deviation={result.deviationPercentage} isHighRisk={isHighRisk} />
+                <StatBox label={t('spotCheck.unitPrice')} value={`${Number(result.unitPrice || 0).toLocaleString()} KZT`} />
+                <StatBox label={t('spotCheck.marketBaseline')} value={`${(result.marketPrice || 0).toLocaleString()} KZT`} />
+                <StatBox label={t('spotCheck.quantity')} value={`${Number(result.quantity || 0).toLocaleString()} ${result.unit || 'ед.'}`} />
+                <DeviationBox deviation={result.deviationPercentage} isHighRisk={isHighRisk} t={t} />
             </div>
 
             {result.allIndicators?.length > 0 && (
-                <IndicatorsTable indicators={result.allIndicators} />
+                <IndicatorsTable indicators={result.allIndicators} t={t} />
             )}
 
             {result.totalSum != null && (
                 <div className="px-8 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center text-sm">
                     <span className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">
-                        Total Valuation: <span className="text-indigo-600 font-black ml-2 text-base">{Number(result.totalSum).toLocaleString()} KZT</span>
+                        {t('spotCheck.totalValuation')}: <span className="text-indigo-600 font-black ml-2 text-base">{Number(result.totalSum).toLocaleString()} KZT</span>
                     </span>
                     <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
                         result.marketSource === 'market_indicator'
@@ -161,40 +152,32 @@ const LotResultCard = ({ result }) => {
 /* ── Main Component ── */
 
 const SpotCheck = () => {
-    const [mode, setMode] = useState('text'); // 'text' | 'lot'
-
-    // Text analysis state
+    const [mode, setMode] = useState('text');
     const [text, setText] = useState('');
     const [results, setResults] = useState([]);
-
-    // Lot analysis state
     const [lotId, setLotId] = useState('');
     const [lotResult, setLotResult] = useState(null);
-
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [threshold, setThreshold] = useState(localStorage.getItem('userRiskThreshold') || '20');
     const [exporting, setExporting] = useState(false);
-
     const [history, setHistory] = useState([]);
     const [showHistory, setShowHistory] = useState(false);
     const [loadedFromHistory, setLoadedFromHistory] = useState(false);
-
     const textResultsRef = useRef(null);
     const lotResultRef = useRef(null);
     const fileInputRef = useRef(null);
     const [draftSaved, setDraftSaved] = useState(false);
     const [fileStatus, setFileStatus] = useState({ state: 'idle', name: '' });
+    const { t } = useTranslation();
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
-    // Load draft on mount
     useEffect(() => {
         const saved = localStorage.getItem('spotcheck_draft');
         if (saved) setText(saved);
     }, []);
 
-    // Auto-save draft with debounce
     useEffect(() => {
         const timer = setTimeout(() => {
             if (text && text.trim()) {
@@ -231,9 +214,8 @@ const SpotCheck = () => {
         setShowHistory(false);
         try {
             const response = await fetch(`${apiUrl}/api/analysis/contracts/${item.id}`, { credentials: 'include' });
-            if (!response.ok) throw new Error('Failed to load history details.');
+            if (!response.ok) throw new Error(t('spotCheck.failedLoadHistory'));
             const data = await response.json();
-            
             setText(item.originalText || '');
             setThreshold(item.threshold?.toString() || '20');
             if (Array.isArray(data)) {
@@ -273,7 +255,7 @@ const SpotCheck = () => {
                 window.location.href = '/login';
                 return;
             }
-            if (!response.ok) throw new Error('Analysis failed. Please check the contract text.');
+            if (!response.ok) throw new Error(t('spotCheck.analysisFailed'));
 
             const data = await response.json();
             if (Array.isArray(data)) {
@@ -305,7 +287,7 @@ const SpotCheck = () => {
             }
 
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Lot analysis failed.');
+            if (!response.ok) throw new Error(data.error || t('spotCheck.lotAnalysisFailed'));
 
             setLotResult(data);
         } catch (err) {
@@ -330,12 +312,11 @@ const SpotCheck = () => {
                         clonedEl.style.padding = '20px';
                         clonedEl.style.backgroundColor = '#ffffff';
                     }
-                    // Remove all animations and transitions
                     const style = clonedDoc.createElement('style');
                     style.innerHTML = `
-                        * { 
-                            animation: none !important; 
-                            transition: none !important; 
+                        * {
+                            animation: none !important;
+                            transition: none !important;
                             -webkit-print-color-adjust: exact !important;
                             print-color-adjust: exact !important;
                         }
@@ -379,7 +360,7 @@ const SpotCheck = () => {
             file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
         if (!isPdf && !isDocx) {
-            setFileStatus({ state: 'error', name: file.name, msg: 'Only PDF and DOCX files are supported.' });
+            setFileStatus({ state: 'error', name: file.name, msg: t('spotCheck.onlyPdfDocx') });
             return;
         }
 
@@ -404,7 +385,7 @@ const SpotCheck = () => {
             setFileStatus({ state: 'done', name: file.name });
         } catch (err) {
             console.error('File parsing failed:', err);
-            setFileStatus({ state: 'error', name: file.name, msg: 'Failed to parse file. Try copying the text manually.' });
+            setFileStatus({ state: 'error', name: file.name, msg: t('spotCheck.failedParseFile') });
         }
     };
 
@@ -434,15 +415,15 @@ const SpotCheck = () => {
                 <div className="space-y-2">
                     <div className="flex items-center gap-2">
                         <span className="w-8 h-1 bg-indigo-600 rounded-full" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Analytical Tool</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('spotCheck.analyticalTool')}</span>
                     </div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight text-gray-800">Intelligence Spot-Check</h1>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight text-gray-800">{t('spotCheck.title')}</h1>
                 </div>
                 <button
                     onClick={() => { setShowHistory(true); fetchHistory(); }}
                     className="px-6 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-2xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2"
                 >
-                    📜 History
+                    📜 {t('spotCheck.history')}
                 </button>
             </header>
 
@@ -456,7 +437,7 @@ const SpotCheck = () => {
                             : 'text-slate-500 hover:text-slate-700'
                     }`}
                 >
-                    📄 Text Analysis
+                    📄 {t('spotCheck.textAnalysis')}
                 </button>
                 <button
                     onClick={() => handleModeSwitch('lot')}
@@ -466,7 +447,7 @@ const SpotCheck = () => {
                             : 'text-slate-500 hover:text-slate-700'
                     }`}
                 >
-                    🔎 Lot Lookup
+                    🔎 {t('spotCheck.lotLookup')}
                 </button>
             </div>
 
@@ -476,10 +457,10 @@ const SpotCheck = () => {
                 <div className="relative z-10">
                     <div className="flex items-center justify-between mb-4">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center">
-                            <span className="mr-2">⚙️</span> Sensitivity Matrix:
+                            <span className="mr-2">⚙️</span> {t('spotCheck.sensitivityMatrix')}
                         </label>
                         <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg border border-indigo-100 uppercase">
-                            {threshold}% Threshold
+                            {t('spotCheck.threshold', { value: threshold })}
                         </span>
                     </div>
                     <input
@@ -491,8 +472,8 @@ const SpotCheck = () => {
                         className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                     />
                     <div className="flex justify-between text-[8px] font-black text-slate-300 mt-2 uppercase tracking-widest">
-                        <span>Strict Monitoring</span>
-                        <span>High Tolerance</span>
+                        <span>{t('spotCheck.strictMonitoring')}</span>
+                        <span>{t('spotCheck.highTolerance')}</span>
                     </div>
                 </div>
             </div>
@@ -501,7 +482,7 @@ const SpotCheck = () => {
             {mode === 'text' && (
                 <div className="bg-white rounded-[2.5rem] border border-slate-200/60 p-8 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.02)] transition-all">
                     <label className="block text-slate-900 font-black text-sm uppercase tracking-widest mb-6 ml-2 flex items-center">
-                        <span className="mr-3 text-indigo-500 text-xl">📄</span> Payload Specification
+                        <span className="mr-3 text-indigo-500 text-xl">📄</span> {t('spotCheck.payloadSpecification')}
                     </label>
 
                     <div
@@ -529,17 +510,17 @@ const SpotCheck = () => {
                         <div className="flex-1 min-w-0">
                             {fileStatus.state === 'idle' && (
                                 <>
-                                    <p className="text-sm font-black text-slate-900">Drop PDF or DOCX here</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Automatic specification extraction</p>
+                                    <p className="text-sm font-black text-slate-900">{t('spotCheck.dropFileHere')}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{t('spotCheck.automaticExtraction')}</p>
                                 </>
                             )}
                             {fileStatus.state === 'parsing' && (
-                                <p className="text-sm font-black text-indigo-600">Harvesting {fileStatus.name}…</p>
+                                <p className="text-sm font-black text-indigo-600">{t('spotCheck.harvesting', { name: fileStatus.name })}</p>
                             )}
                             {fileStatus.state === 'done' && (
                                 <>
                                     <p className="text-sm font-black text-emerald-700 truncate">{fileStatus.name}</p>
-                                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-1">Ingestion complete — Review below</p>
+                                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-1">{t('spotCheck.ingestionComplete')}</p>
                                 </>
                             )}
                             {fileStatus.state === 'error' && (
@@ -559,20 +540,20 @@ const SpotCheck = () => {
 
                     <textarea
                         className="w-full h-48 p-8 bg-slate-50 border border-slate-200 rounded-[2rem] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 transition-all font-medium leading-relaxed resize-none mb-4"
-                        placeholder="Paste technical specifications or technical requirements here..."
+                        placeholder={t('spotCheck.pasteSpecification')}
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                     />
                     <div className="flex items-center justify-between px-2 min-h-[24px]">
                         <span className={`text-[10px] font-black uppercase tracking-widest transition-opacity duration-300 ${draftSaved ? 'text-emerald-500 opacity-100' : 'opacity-0'}`}>
-                            ✓ Auto-Draft Persistent
+                            {t('spotCheck.autoDraftSaved')}
                         </span>
                         {text && (
                             <button
                                 onClick={() => { setText(''); localStorage.removeItem('spotcheck_draft'); }}
                                 className="text-[10px] font-black text-slate-400 hover:text-rose-500 uppercase tracking-widest transition-colors"
                             >
-                                Purge specification
+                                {t('spotCheck.purgeSpecification')}
                             </button>
                         )}
                     </div>
@@ -585,7 +566,7 @@ const SpotCheck = () => {
                                 : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20 hover:scale-[1.01]'
                         }`}
                     >
-                        {loading ? <LoadingSpinner label="PROCESSING NLP MATRIX..." /> : <><span>RUN INTELLIGENCE SCAN</span> 🚀</>}
+                        {loading ? <LoadingSpinner label={t('spotCheck.processingNlp')} /> : <><span>{t('spotCheck.runScan')}</span> 🚀</>}
                     </button>
                 </div>
             )}
@@ -594,13 +575,13 @@ const SpotCheck = () => {
             {mode === 'lot' && (
                 <div className="bg-white rounded-[2.5rem] border border-slate-200/60 p-8 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.02)] transition-all">
                     <label className="block text-slate-900 font-black text-sm uppercase tracking-widest mb-6 ml-2 flex items-center">
-                        <span className="mr-3 text-indigo-500 text-xl">🆔</span> Goszakup Lot Identifier
+                        <span className="mr-3 text-indigo-500 text-xl">🆔</span> {t('spotCheck.goszakupId')}
                     </label>
                     <div className="flex gap-4">
                         <input
                             type="text"
                             className="flex-1 p-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all font-bold tracking-widest text-slate-800 placeholder:text-slate-300"
-                            placeholder="ENTER LOT ID (e.g. 73829103)"
+                            placeholder={t('spotCheck.enterLotId')}
                             value={lotId}
                             onChange={(e) => setLotId(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && !loading && lotId.trim() && handleAnalyzeLot()}
@@ -614,7 +595,7 @@ const SpotCheck = () => {
                                     : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'
                             }`}
                         >
-                            {loading ? <LoadingSpinner label="" /> : 'LOOKUP'}
+                            {loading ? <LoadingSpinner label="" /> : t('spotCheck.lookup')}
                         </button>
                     </div>
                 </div>
@@ -631,17 +612,17 @@ const SpotCheck = () => {
             {lotResult && (
                 <div className="space-y-6 animate-in slide-in-from-bottom-6 duration-700">
                     <div className="flex items-center justify-between px-2">
-                        <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase tracking-widest text-sm">Detection Result</h2>
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase tracking-widest text-sm">{t('spotCheck.detectionResult')}</h2>
                         <button
                             onClick={() => handleExportPdf(lotResultRef, `lot-${lotResult.lotId || 'result'}.pdf`)}
                             disabled={exporting}
                             className="px-6 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2 disabled:opacity-50"
                         >
-                            {exporting ? <LoadingSpinner label="EXPORTING..." /> : <><span>SAVE AS PDF</span> 📄</>}
+                            {exporting ? <LoadingSpinner label={t('spotCheck.exporting')} /> : <><span>{t('spotCheck.saveAsPdf')}</span> 📄</>}
                         </button>
                     </div>
                     <div ref={lotResultRef} data-export-container>
-                        <LotResultCard result={lotResult} />
+                        <LotResultCard result={lotResult} t={t} />
                     </div>
                 </div>
             )}
@@ -651,14 +632,14 @@ const SpotCheck = () => {
                 <div className="space-y-8 animate-in slide-in-from-bottom-8 duration-700">
                     <div className="flex items-center justify-between px-2">
                         <div className="space-y-1">
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Intelligence Log</h2>
+                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">{t('spotCheck.intelligenceLog')}</h2>
                             <div className="flex items-center gap-3">
                                 <span className="bg-indigo-50 text-indigo-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase border border-indigo-100 tracking-widest">
-                                    {results.length} Entities Found
+                                    {t('spotCheck.entitiesFound', { count: results.length })}
                                 </span>
                                 {loadedFromHistory && (
                                     <span className="bg-amber-50 text-amber-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase border border-amber-100 tracking-widest animate-pulse">
-                                        📜 History
+                                        📜 {t('spotCheck.history')}
                                     </span>
                                 )}
                             </div>
@@ -668,7 +649,7 @@ const SpotCheck = () => {
                             disabled={exporting}
                             className="px-6 py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2 disabled:opacity-50"
                         >
-                            {exporting ? <LoadingSpinner label="EXPORTING..." /> : <><span>SAVE ALL AS PDF</span> 📄</>}
+                            {exporting ? <LoadingSpinner label={t('spotCheck.exporting')} /> : <><span>{t('spotCheck.saveAllAsPdf')}</span> 📄</>}
                         </button>
                     </div>
 
@@ -676,8 +657,8 @@ const SpotCheck = () => {
                     {results.map((result, index) => {
                         const isHighRisk = result?.isHighRisk;
                         const sourceLabel = result?.marketSource === 'market_indicator'
-                            ? '📊 Matrix'
-                            : '📈 History';
+                            ? `📊 ${t('spotCheck.marketMatrix')}`
+                            : `📈 ${t('spotCheck.historyAnalysis')}`;
                         return (
                             <div
                                 key={index}
@@ -690,24 +671,24 @@ const SpotCheck = () => {
                                         <span className="mr-3">{isHighRisk ? '🚩' : '✅'}</span>
                                         {result?.item?.item_name || 'Unnamed Item'}
                                     </h3>
-                                    <RiskBadge isHighRisk={isHighRisk} />
+                                    <RiskBadge isHighRisk={isHighRisk} t={t} />
                                 </div>
                                 <div className="p-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 bg-white">
-                                    <StatBox label="Extracted Price" value={`${(result?.item?.price || 0).toLocaleString()} KZT`} />
-                                    <StatBox label="Market Baseline" value={`${(result?.marketPrice || 0).toLocaleString()} KZT`} />
-                                    <StatBox label="Quantity" value={`${result?.item?.qty || 0} ${result?.item?.unit || 'ед.'}`} />
-                                    <DeviationBox deviation={result?.deviationPercentage} isHighRisk={isHighRisk} />
+                                    <StatBox label={t('spotCheck.unitPrice')} value={`${(result?.item?.price || 0).toLocaleString()} KZT`} />
+                                    <StatBox label={t('spotCheck.marketBaseline')} value={`${(result?.marketPrice || 0).toLocaleString()} KZT`} />
+                                    <StatBox label={t('spotCheck.quantity')} value={`${result?.item?.qty || 0} ${result?.item?.unit || 'ед.'}`} />
+                                    <DeviationBox deviation={result?.deviationPercentage} isHighRisk={isHighRisk} t={t} />
                                 </div>
                                 {result?.allIndicators?.length > 0 && (
-                                    <IndicatorsTable indicators={result.allIndicators} />
+                                    <IndicatorsTable indicators={result.allIndicators} t={t} />
                                 )}
                                 <div className="px-8 py-3 bg-slate-50/50 border-t border-slate-100 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex justify-between items-center">
                                     <span className={`px-3 py-1 rounded-full border bg-white ${
                                         result?.marketSource === 'market_indicator'
                                             ? 'text-indigo-600 border-indigo-100'
                                             : 'text-amber-600 border-amber-100'
-                                    }`}>{sourceLabel} Analysis</span>
-                                    <span className="text-indigo-600">Scan Match: 100%</span>
+                                    }`}>{sourceLabel}</span>
+                                    <span className="text-indigo-600">{t('spotCheck.scanMatch')}</span>
                                 </div>
                             </div>
                         );
@@ -723,11 +704,11 @@ const SpotCheck = () => {
                         <span className="text-5xl">{mode === 'lot' ? '🔎' : '📝'}</span>
                     </div>
                     <div className="space-y-2">
-                        <h3 className="text-xl font-black text-slate-900 tracking-tight">System Ready for Scan</h3>
+                        <h3 className="text-xl font-black text-slate-900 tracking-tight">{t('spotCheck.systemReady')}</h3>
                         <p className="text-slate-400 font-medium max-w-sm mx-auto">
                             {mode === 'lot'
-                                ? 'Enter a Goszakup lot identifier to assess risk levels.'
-                                : 'Paste a technical specification to begin analysis.'}
+                                ? t('spotCheck.systemReadyLot')
+                                : t('spotCheck.systemReadyText')}
                         </p>
                     </div>
                 </div>
@@ -740,8 +721,8 @@ const SpotCheck = () => {
                     <div className="relative w-full max-w-2xl max-h-[85vh] bg-white rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-500">
                         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <div>
-                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Intelligence Log</h2>
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Previous Market Scans</p>
+                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">{t('spotCheck.intelligenceLog')}</h2>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{t('spotCheck.previousScans')}</p>
                             </div>
                             <button
                                 onClick={() => setShowHistory(false)}
@@ -754,7 +735,7 @@ const SpotCheck = () => {
                             {(!history || history.length === 0) ? (
                                 <div className="text-center py-12">
                                     <p className="text-4xl mb-2">📭</p>
-                                    <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Registry Empty</p>
+                                    <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">{t('spotCheck.registryEmpty')}</p>
                                 </div>
                             ) : (
                                 history.map((item) => (
@@ -765,21 +746,21 @@ const SpotCheck = () => {
                                     >
                                         <div className="flex justify-between items-start mb-3">
                                             <span className="px-3 py-1 bg-white text-indigo-600 text-[10px] font-black rounded-lg border border-indigo-50 shadow-sm uppercase tracking-tighter">
-                                                Scan #{item.id}
+                                                {t('spotCheck.scan', { id: item.id })}
                                             </span>
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                                 {item.date ? new Date(item.date).toLocaleDateString() : '—'}
                                             </span>
                                         </div>
                                         <p className="text-sm text-slate-600 font-medium line-clamp-2 leading-relaxed italic pr-12">
-                                            "{item.originalText || 'No text content'}"
+                                            "{item.originalText || t('spotCheck.noTextContent')}"
                                         </p>
                                         <div className="mt-3 flex items-center gap-3">
                                             <span className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">
-                                                Sensitivity: {item.threshold || 20}%
+                                                {t('spotCheck.sensitivity')}: {item.threshold || 20}%
                                             </span>
                                             <span className="text-indigo-500 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1">
-                                                Load Matrix →
+                                                {t('spotCheck.loadMatrix')} →
                                             </span>
                                         </div>
                                     </button>

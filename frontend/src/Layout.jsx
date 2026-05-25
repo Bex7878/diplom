@@ -1,9 +1,12 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const Layout = ({ children }) => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const userRole = localStorage.getItem('userRole');
     const username = localStorage.getItem('username') || 'User';
 
@@ -17,13 +20,13 @@ const Layout = ({ children }) => {
     };
 
     const navItems = [
-        { path: '/', label: 'Spot-Check', icon: '🔍' },
-        { path: '/lots', label: 'Historical Data', icon: '📊' },
-        { path: '/top-risks', label: 'Risk Intelligence', icon: '🚩' },
+        { path: '/', label: t('nav.spotCheck'), icon: '🔍' },
+        { path: '/lots', label: t('nav.historicalData'), icon: '📊' },
+        { path: '/top-risks', label: t('nav.riskIntelligence'), icon: '🚩' },
     ];
 
     if (userRole === 'ROLE_ADMIN') {
-        navItems.push({ path: '/admin', label: 'System Control', icon: '⚙️' });
+        navItems.push({ path: '/admin', label: t('nav.systemControl'), icon: '⚙️' });
     }
 
     return (
@@ -37,9 +40,9 @@ const Layout = ({ children }) => {
                         </div>
                         <h2 className="text-xl font-extrabold tracking-tight">DEVIATOR<span className="text-indigo-400">.AI</span></h2>
                     </div>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold ml-1">Analytical Intelligence</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold ml-1">{t('nav.analyticalIntelligence')}</p>
                 </div>
-                
+
                 <nav className="flex-1 px-4 mt-4 space-y-1">
                     {navItems.map((item) => {
                         const isActive = location.pathname === item.path;
@@ -62,20 +65,23 @@ const Layout = ({ children }) => {
                 </nav>
 
                 <div className="p-6 m-4 bg-slate-800/40 rounded-2xl border border-slate-700/50">
-                    <div className="flex items-center mb-4">
+                    <div className="flex items-center mb-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-sm font-bold mr-3 shadow-inner">
                             {username.charAt(0).toUpperCase()}
                         </div>
-                        <div className="overflow-hidden">
+                        <div className="overflow-hidden flex-1">
                             <p className="text-sm font-bold truncate text-white">{username}</p>
                             <p className="text-[10px] uppercase font-bold text-slate-500">{userRole?.replace('ROLE_', '')}</p>
                         </div>
+                    </div>
+                    <div className="mb-3">
+                        <LanguageSwitcher />
                     </div>
                     <button
                         onClick={handleLogout}
                         className="w-full flex items-center justify-center py-2.5 px-4 bg-slate-700 hover:bg-rose-600 text-slate-300 hover:text-white text-xs font-bold rounded-xl transition-all border border-slate-600/50"
                     >
-                        Sign Out
+                        {t('nav.signOut')}
                     </button>
                 </div>
             </aside>

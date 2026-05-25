@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
@@ -11,6 +12,7 @@ const LotSearch = () => {
     const [pageSize, setPageSize] = useState(20);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
+    const { t } = useTranslation();
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -31,7 +33,7 @@ const LotSearch = () => {
                 window.location.href = '/login';
                 return;
             }
-            if (!response.ok) throw new Error('Failed to fetch historical lots');
+            if (!response.ok) throw new Error(t('lotSearch.failedFetch'));
 
             const data = await response.json();
             setLots(data.content || []);
@@ -71,15 +73,15 @@ const LotSearch = () => {
                 <div className="space-y-2">
                     <div className="flex items-center gap-2">
                         <span className="w-8 h-1 bg-emerald-500 rounded-full" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Procurement Repository</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('lotSearch.repository')}</span>
                     </div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">Historical Data Suite</h1>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tight">{t('lotSearch.title')}</h1>
                 </div>
-                
+
                 {totalElements > 0 && (
                     <div className="px-6 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-4 shadow-sm">
                         <div className="text-right">
-                            <p className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest leading-none mb-1 text-xs">Total Records</p>
+                            <p className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest leading-none mb-1 text-xs">{t('lotSearch.totalRecords')}</p>
                             <p className="text-xl font-black text-emerald-600 leading-none">{totalElements.toLocaleString()}</p>
                         </div>
                         <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-xl border border-emerald-50">
@@ -92,14 +94,14 @@ const LotSearch = () => {
             {/* Search Box */}
             <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-[0_1px_3px_rgba(0,0,0,0.05)] relative group overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
-                
+
                 <form onSubmit={handleSearch} className="relative z-10 flex flex-col md:flex-row gap-4">
                     <div className="relative flex-1 group">
                         <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors text-xl">🔍</span>
                         <input
                             type="text"
                             className="w-full pl-16 pr-6 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 transition-all font-bold"
-                            placeholder="SEARCH BY LOT ID, CUSTOMER BIN, OR ITEM NAME..."
+                            placeholder={t('lotSearch.searchPlaceholder')}
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
@@ -112,16 +114,16 @@ const LotSearch = () => {
                         {loading ? (
                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
-                            <><span>QUERY RECORDS</span> 🚀</>
+                            <><span>{t('lotSearch.queryRecords')}</span> 🚀</>
                         )}
                     </button>
                 </form>
                 <div className="mt-6 flex items-center justify-between px-6">
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                        Showing results <span className="text-slate-900">{from}–{to}</span>
+                        {t('lotSearch.showingResults')} <span className="text-slate-900">{from}–{to}</span>
                     </p>
                     <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Rows per page:</span>
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{t('lotSearch.rowsPerPage')}</span>
                         <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 shadow-inner">
                             {PAGE_SIZE_OPTIONS.map((opt) => (
                                 <button
@@ -153,12 +155,12 @@ const LotSearch = () => {
                         <thead>
                             <tr className="bg-slate-50/50">
                                 <th className="px-6 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-12">#</th>
-                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Identifier</th>
-                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Consumer (BIN)</th>
-                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Specification</th>
-                                <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity</th>
-                                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Price</th>
-                                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Valuation</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('lotSearch.identifier')}</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('lotSearch.consumer')}</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('lotSearch.itemSpec')}</th>
+                                <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('lotSearch.quantity')}</th>
+                                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('lotSearch.unitPrice')}</th>
+                                <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('lotSearch.totalValuation')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -179,10 +181,10 @@ const LotSearch = () => {
                                     </td>
                                     <td className="px-8 py-6 max-w-xs">
                                         <p className="text-sm font-black text-slate-900 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                                            {lot.truName || 'Unnamed Entity'}
+                                            {lot.truName || t('lotSearch.unnamedEntity')}
                                         </p>
                                         <p className="text-[10px] text-slate-400 font-bold line-clamp-1 mt-1 italic uppercase tracking-tighter">
-                                            {lot.description || 'No detailed specification data available'}
+                                            {lot.description || t('lotSearch.noSpecData')}
                                         </p>
                                     </td>
                                     <td className="px-8 py-6 whitespace-nowrap text-center">
@@ -208,8 +210,8 @@ const LotSearch = () => {
                                         <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                                             <span className="text-4xl opacity-50">📁</span>
                                         </div>
-                                        <h3 className="text-xl font-black text-slate-900 tracking-tight italic">Registry Empty</h3>
-                                        <p className="text-slate-400 text-sm font-medium mt-2 max-w-xs mx-auto">No records found matching your search criteria. Check your filters or try a broader search.</p>
+                                        <h3 className="text-xl font-black text-slate-900 tracking-tight italic">{t('lotSearch.registryEmpty')}</h3>
+                                        <p className="text-slate-400 text-sm font-medium mt-2 max-w-xs mx-auto">{t('lotSearch.noRecords')}</p>
                                     </td>
                                 </tr>
                             )}
@@ -233,7 +235,7 @@ const LotSearch = () => {
                                 disabled={page === 0}
                                 className="px-5 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-[10px] font-black text-slate-400 hover:text-indigo-600 hover:border-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all uppercase tracking-widest shadow-sm"
                             >
-                                Prev
+                                {t('lotSearch.prev')}
                             </button>
 
                             <div className="flex items-center gap-1.5 mx-3">
@@ -245,7 +247,7 @@ const LotSearch = () => {
                                 disabled={page >= totalPages - 1}
                                 className="px-5 h-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-[10px] font-black text-slate-400 hover:text-indigo-600 hover:border-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all uppercase tracking-widest shadow-sm"
                             >
-                                Next
+                                {t('lotSearch.next')}
                             </button>
                             <button
                                 onClick={() => setPage(totalPages - 1)}
@@ -257,7 +259,7 @@ const LotSearch = () => {
                         </div>
 
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] order-1 md:order-2 bg-white px-4 py-2 rounded-full border border-slate-100 shadow-sm">
-                            Page <span className="text-slate-900">{page + 1}</span> of <span className="text-slate-900">{totalPages}</span>
+                            {t('lotSearch.page')} <span className="text-slate-900">{page + 1}</span> {t('lotSearch.of')} <span className="text-slate-900">{totalPages}</span>
                         </div>
                     </div>
                 )}

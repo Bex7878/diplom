@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -8,6 +10,7 @@ const Login = () => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -15,14 +18,14 @@ const Login = () => {
         setIsLoading(true);
         try {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-            const response = await axios.post(`${apiUrl}/api/auth/login`, 
-                `username=${username}&password=${password}`, 
+            const response = await axios.post(`${apiUrl}/api/auth/login`,
+                `username=${username}&password=${password}`,
                 {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     withCredentials: true
                 }
             );
-            
+
             if (response.status === 200) {
                 const data = response.data;
                 localStorage.setItem('userRole', data.role);
@@ -30,7 +33,7 @@ const Login = () => {
                 navigate('/');
             }
         } catch (err) {
-            setError('Invalid username or password');
+            setError(t('auth.invalidCredentials'));
         } finally {
             setIsLoading(false);
         }
@@ -38,9 +41,12 @@ const Login = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#0F172A] relative overflow-hidden font-sans">
-            {/* Background Decorative Elements */}
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px] animate-pulse" />
+
+            <div className="absolute top-4 right-4 z-20">
+                <LanguageSwitcher />
+            </div>
 
             <div className="w-full max-w-md p-8 relative z-10 animate-in fade-in zoom-in duration-700">
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
@@ -48,20 +54,20 @@ const Login = () => {
                         <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-600/30 mb-6 group transition-transform hover:scale-110">
                             <span className="text-2xl font-black text-white">D</span>
                         </div>
-                        <h2 className="text-3xl font-black text-white tracking-tight mb-2">Welcome Back</h2>
-                        <p className="text-slate-400 text-sm font-medium">Access the Deviator.ai Analytical Suite</p>
+                        <h2 className="text-3xl font-black text-white tracking-tight mb-2">{t('auth.welcomeBack')}</h2>
+                        <p className="text-slate-400 text-sm font-medium">{t('auth.accessSuite')}</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-2">
                             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1" htmlFor="username">
-                                Username
+                                {t('auth.username')}
                             </label>
                             <div className="relative group">
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     id="username"
-                                    placeholder="Enter your username"
+                                    placeholder={t('auth.enterUsername')}
                                     className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all group-hover:border-white/20"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
@@ -73,12 +79,12 @@ const Login = () => {
 
                         <div className="space-y-2">
                             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">
-                                Password
+                                {t('auth.password')}
                             </label>
                             <div className="relative group">
-                                <input 
-                                    type="password" 
-                                    placeholder="••••••••"
+                                <input
+                                    type="password"
+                                    placeholder={t('auth.enterPassword')}
                                     className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all group-hover:border-white/20"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -95,7 +101,7 @@ const Login = () => {
                             </div>
                         )}
 
-                        <button 
+                        <button
                             disabled={isLoading}
                             className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 overflow-hidden relative"
                         >
@@ -103,7 +109,7 @@ const Login = () => {
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
                                 <>
-                                    <span>Sign In</span>
+                                    <span>{t('auth.signIn')}</span>
                                     <span className="text-lg">→</span>
                                 </>
                             )}
@@ -111,16 +117,16 @@ const Login = () => {
 
                         <div className="pt-6 text-center border-t border-white/5">
                             <p className="text-slate-500 text-sm">
-                                Don't have an account? 
+                                {t('auth.dontHaveAccount')}
                                 <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-bold ml-2 transition-colors">
-                                    Create one now
+                                    {t('auth.createOneNow')}
                                 </Link>
                             </p>
                         </div>
                     </form>
                 </div>
                 <p className="text-center mt-8 text-slate-600 text-xs font-bold uppercase tracking-widest">
-                    Deviator.ai &copy; 2026
+                    {t('common.copyright')}
                 </p>
             </div>
         </div>
