@@ -37,7 +37,12 @@ public class AnalysisService {
     public Map<String, Object> triggerScraper(String sessionCookie) {
         String url = pythonBaseUrl + "/api/scrape";
         if (sessionCookie != null && !sessionCookie.isBlank()) {
-            url += "?session_cookie=" + sessionCookie;
+            try {
+                url += "?session_cookie=" + java.net.URLEncoder.encode(sessionCookie, java.nio.charset.StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                logger.error("Failed to encode session cookie: {}", e.getMessage());
+                url += "?session_cookie=" + sessionCookie;
+            }
         }
 
         try {

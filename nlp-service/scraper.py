@@ -1,23 +1,21 @@
 from fastapi import APIRouter, HTTPException
 from bs4 import BeautifulSoup
+from urllib.parse import unquote
 import requests
 import time
 import random
 
 router = APIRouter()
 
-# ==========================================
-# ⚙️ НАСТРОЙКИ
-# ==========================================
 BASE_URL = "https://v3bl.goszakup.gov.kz"
 SEARCH_URL = f"{BASE_URL}/ru/search/lots"
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-    # Вставь сюда свой очищенный куки:
-    "Cookie": "ci_session=WTIAOlBnBWoFKlMiVThbalBjUmULAlJ3DnVXZQAmVHVUP1RrU20GVQ1uD2sAXwF2AW5XJlY7UmRUYwUyCgNVcABqVGJdaVNlV2UCZwczVjtZagBkUDEFZgVhU2lVN1tpUGVSOwtqUmcOY1c1ADZUZ1QyVDNTNwY5DTIPbgA0ATcBZldtVjlSa1QzBW0Kb1ViADhUNF0%2FUzhXbQJnB2BWbVlrADZQYAVjBWdTZlUyWz1QNVI6CztSZA4wVzYAbFQ0VApUJlM4BnkNPQ8%2BADMBbgEJV3dWaFIiVAgFaQo7VTYAelRmXXtTclcJAnAHbFYpWWkAMVBnBWoFDVNzVTNba1BqUnELbFJmDj9XLgBhVDZUeFQ2UzAGOg1bDy0AOAEnAW9XZFYxUmhUCwUqCipVIQBtVHFdV1NgVzICNwc5Vi5ZDwAiUGgFIwVrU2BVM1tqUGlSAwt8UhgOaVd6ADxUalQ6VGVTLAY%2FDSkPPwAjAXwBAlc8Vm9SNlQ4BX8KLFVyAEZUV10oUzBXZQJ8B2dWYVlzAFdQOgU%2BBWdTZVU5W3tQK1JpC2pSfA4mV0EAJVR2VDpUYVNUBm8NZQ9EAGoBIAF6V2BWMlJlVHkFOwppVXIAIFRIXUBTVVcYAh4He1Z6WT8AaVA4BTUFcVMWVWdbOFA4UjALd1J1DkVXaAAnVGlUO1RhUywGOw0zDzgALQFkAXtXZVYvUmJUdwVbCj5VNABpVHFdYVMuV2ACYQdgVnRZYAA2UA8FcgVqUyJVOFtqUGBSZQsCUncOaldhACZUclQJVGVTYAZ%2BDW4PeQBqASABLFcJViNSaVQ%2BBTIKblVlAD9UNF06UzFXZwJmB2VWb1loAH0%3D"
+    "Accept-Encoding": "gzip, deflate, br",
+    "Referer": "https://v3bl.goszakup.gov.kz/ru/search/lots",
 }
 
 def clean_number(text: str) -> float:
@@ -81,62 +79,97 @@ def parse_lot_page(html_content: str):
 
 @router.get("/api/scrape")
 def scrape_goszakup(session_cookie: str = None):
-    print(f"⏳ [Scraper] Запускаю парсер через единую сессию (Session)...")
+    print(f"⏳ [Scraper] Запускаю парсер...")
 
-    # 💡 СОЗДАЕМ СЕССИЮ: Теперь мы работаем как настоящий браузер!
+    if not session_cookie:
+        print("⚠️ Cookie не передан — без авторизации парсинг невозможен")
+        return {"status": "error", "message": "Требуется session_cookie для авторизации на goszakup.gov.kz", "data": []}
+
     session = requests.Session()
-    
-    current_headers = HEADERS.copy()
-    if session_cookie:
-        current_headers["Cookie"] = session_cookie
-        print("🔑 Использую переданный Cookie")
-    else:
-        print("⚠️ Использую встроенный Cookie (может быть просрочен)")
-        
-    session.headers.update(current_headers)
+    session.headers.update(HEADERS)
+
+    # FastAPI уже URL-декодирует query-параметры, но делаем unquote ещё раз на случай двойного кодирования
+    decoded_cookie = unquote(session_cookie)
+
+    # --- ЛОГ: что именно пришло в качестве куки ---
+    print(f"📥 [Cookie] Получено символов: {len(decoded_cookie)}")
+    print(f"📥 [Cookie] Первые 80 символов: {decoded_cookie[:80]}")
+    cookie_names = [p.strip().split('=')[0] for p in decoded_cookie.split(';') if '=' in p]
+    print(f"📥 [Cookie] Имена куков: {cookie_names}")
+
+    # Разбираем строку "name=value; name2=value2" и устанавливаем куки через сессию
+    set_count = 0
+    for part in decoded_cookie.split(';'):
+        part = part.strip()
+        if '=' in part:
+            name, _, value = part.partition('=')
+            session.cookies.set(name.strip(), unquote(value.strip()), domain='v3bl.goszakup.gov.kz')
+            set_count += 1
+    print(f"✅ [Cookie] Установлено куков в сессию: {set_count}")
+
+    # --- ЛОГ: проверка заголовков сессии ---
+    print(f"🌐 [Headers] Отправляемые заголовки: {dict(session.headers)}")
 
     try:
+        print(f"🌐 [HTTP] GET {SEARCH_URL}")
         search_response = session.get(SEARCH_URL, timeout=15)
+        print(f"🌐 [HTTP] Статус ответа: {search_response.status_code}")
+        print(f"🌐 [HTTP] URL после редиректов: {search_response.url}")
 
         soup = BeautifulSoup(search_response.text, 'html.parser')
         page_title = soup.title.string if soup.title else "Заголовок не найден"
-        print(f"👀 СЕРВЕР ОТВЕТИЛ: '{page_title}'")
+        print(f"👀 [Page] Заголовок страницы: '{page_title}'")
+
+        # Проверка авторизации
+        if "авторизац" in page_title.lower() or "войти" in page_title.lower() or "login" in page_title.lower():
+            print("🚫 [Auth] ОШИБКА АВТОРИЗАЦИИ — куки недействительны или просрочены")
+            print(f"🚫 [Auth] Фрагмент HTML (первые 500 символов): {search_response.text[:500]}")
+            return {"status": "error", "message": f"Авторизация не прошла. Страница: '{page_title}'. Обновите куки.", "data": []}
 
         urls_to_scrape = extract_links_from_search(search_response.text)
         urls_to_scrape = list(dict.fromkeys(urls_to_scrape))
+        print(f"🔍 [Links] Найдено уникальных ссылок /view/: {len(urls_to_scrape)}")
 
-        print(f"🔍 Найдено ссылок для парсинга: {len(urls_to_scrape)}")
-
-        if not urls_to_scrape:
+        if urls_to_scrape:
+            print(f"🔍 [Links] Первые 3 ссылки: {urls_to_scrape[:3]}")
+        else:
+            print(f"🔍 [Links] Ссылок не найдено. Фрагмент HTML: {search_response.text[500:1000]}")
             return {"status": "warning", "message": "Ссылки не найдены.", "data": []}
 
     except Exception as e:
+        print(f"💥 [HTTP] Исключение при запросе главной страницы: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка на главной странице: {e}")
 
     parsed_results = []
-    print(f"🎯 Начинаю детальный парсинг {len(urls_to_scrape)} лотов (с умными паузами)...")
+    failed_count = 0
+    print(f"🎯 [Scraper] Начинаю детальный парсинг {len(urls_to_scrape)} лотов...")
 
     for index, url in enumerate(urls_to_scrape, 1):
         try:
-            # 💡 УМНАЯ ПАУЗА: случайное время от 1.5 до 3.0 секунд, чтобы обмануть анти-бот
             sleep_time = random.uniform(1.5, 3.0)
+            print(f"⏳ [{index}/{len(urls_to_scrape)}] Пауза {sleep_time:.1f}с → {url}")
             time.sleep(sleep_time)
 
-            # Используем session.get вместо requests.get, и увеличили таймаут до 20
             response = session.get(url, timeout=20)
+            print(f"   HTTP {response.status_code} | URL: {response.url}")
 
             if response.status_code == 200:
                 lot_info = parse_lot_page(response.text)
                 if lot_info:
                     parsed_results.append(lot_info)
-                    print(f"✅ [{index}] Спарсен лот: {lot_info['lot_id']} - {lot_info['tru_name']}")
+                    print(f"✅ [{index}] Лот: {lot_info['lot_id']} | {lot_info['tru_name'][:60]} | Цена: {lot_info['unit_price']}")
                 else:
-                    print(f"⚠️ [{index}] Не удалось найти данные в лоте: {url}")
+                    failed_count += 1
+                    print(f"⚠️ [{index}] Данные лота не найдены в HTML: {url}")
             else:
-                print(f"❌ [{index}] Ошибка {response.status_code} по ссылке: {url}")
+                failed_count += 1
+                print(f"❌ [{index}] Статус {response.status_code}: {url}")
 
         except Exception as e:
-            print(f"❌ [{index}] Тайм-аут или ошибка соединения: {url}")
+            failed_count += 1
+            print(f"❌ [{index}] Исключение: {e} | URL: {url}")
 
-    print(f"🎉 Завершено! Успешно собрано: {len(parsed_results)} записей из {len(urls_to_scrape)}")
+    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print(f"🎉 [Done] Спарсено: {len(parsed_results)} | Ошибок: {failed_count} | Всего: {len(urls_to_scrape)}")
+    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     return {"status": "success", "total_scraped": len(parsed_results), "data": parsed_results}
