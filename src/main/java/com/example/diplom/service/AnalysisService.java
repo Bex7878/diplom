@@ -352,11 +352,13 @@ public class AnalysisService {
         return contractRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<BenchmarkLog> getHighRiskOperations(Double threshold) {
         BigDecimal riskThreshold = (threshold != null) ? BigDecimal.valueOf(threshold) : BigDecimal.valueOf(20);
         return benchmarkLogRepository.findByDeviationPercentageGreaterThan(riskThreshold);
     }
 
+    @Transactional(readOnly = true)
     public List<BenchmarkLog> getTop10Risks() {
         return benchmarkLogRepository.findTop10ByOrderByDeviationPercentageDesc();
     }

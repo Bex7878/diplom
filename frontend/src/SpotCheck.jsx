@@ -231,6 +231,12 @@ const SpotCheck = () => {
         }
     };
 
+    useEffect(() => {
+        const handler = (e) => setThreshold(e.detail);
+        window.addEventListener('thresholdChange', handler);
+        return () => window.removeEventListener('thresholdChange', handler);
+    }, []);
+
     const handleThresholdChange = (e) => {
         const value = e.target.value;
         setThreshold(value);
@@ -469,7 +475,7 @@ const SpotCheck = () => {
                         max="100"
                         value={threshold}
                         onChange={handleThresholdChange}
-                        className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        className="w-full cursor-pointer accent-indigo-600"
                     />
                     <div className="flex justify-between text-[8px] font-black text-slate-300 mt-2 uppercase tracking-widest">
                         <span>{t('spotCheck.strictMonitoring')}</span>

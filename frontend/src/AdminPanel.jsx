@@ -90,6 +90,7 @@ const AdminPanel = () => {
         const value = e.target.value;
         setThreshold(value);
         localStorage.setItem('userRiskThreshold', value);
+        window.dispatchEvent(new CustomEvent('thresholdChange', { detail: value }));
     };
 
     const handleGoszakupLogin = async (e) => {
