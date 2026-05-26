@@ -23,6 +23,13 @@ const AdminPanel = () => {
     const [excelLoading, setExcelLoading] = useState(false);
     const [excelResult, setExcelResult] = useState(null);
     const [excelError, setExcelError] = useState(null);
+    const [iin, setIin] = useState('');
+    const [password, setPassword] = useState('');
+    const [loginLoading, setLoginLoading] = useState(false);
+    const [loginError, setLoginError] = useState(null);
+    const [loginSuccess, setLoginSuccess] = useState(null);
+    const [scraperPages, setScraperPages] = useState('3');
+    const [scraperRecords, setScraperRecords] = useState('50');
     const { t } = useTranslation();
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
@@ -85,6 +92,31 @@ const AdminPanel = () => {
         localStorage.setItem('userRiskThreshold', value);
     };
 
+    const handleGoszakupLogin = async (e) => {
+        e.preventDefault();
+        setLoginLoading(true);
+        setLoginError(null);
+        setLoginSuccess(null);
+        try {
+            const response = await fetch(`${apiUrl}/api/admin/goszakup-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ iin, password }),
+                credentials: 'include',
+            });
+            const data = await response.json();
+            if (!response.ok || data.status === 'error') {
+                throw new Error(data.message || 'Ошибка авторизации');
+            }
+            setCookie(data.cookie);
+            setLoginSuccess(`Авторизован. Куки установлены автоматически.`);
+        } catch (err) {
+            setLoginError(err.message);
+        } finally {
+            setLoginLoading(false);
+        }
+    };
+
     const handleTriggerScraper = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -95,7 +127,7 @@ const AdminPanel = () => {
             const response = await fetch(`${apiUrl}/api/admin/trigger-scraper`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cookie }),
+                body: JSON.stringify({ cookie, pages: parseInt(scraperPages), records_per_page: parseInt(scraperRecords) }),
                 credentials: 'include',
             });
 
@@ -446,13 +478,78 @@ const AdminPanel = () => {
                         </div>
                     </div>
 
-                    <div className="lg:w-2/3">
-                        <form onSubmit={handleTriggerScraper} className="space-y-8">
-                            <div className="space-y-4">
-                                <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-1">{t('admin.cookiePayload')}</label>
+                    <div className="lg:w-2/3 space-y-8">
+                        {/* Автологин на Goszakup */}
+                        <div className="p-6 bg-white/5 border border-white/10 rounded-[2rem] space-y-4">
+                            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Авто-авторизация Goszakup</h4>
+                            <form onSubmit={handleGoszakupLogin} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">ИИН / БИН</label>
+                                    <input
+                                        type="text"
+                                        value={iin}
+                                        onChange={e => setIin(e.target.value)}
+                                        placeholder="123456789012"
+                                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm font-mono placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-all"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Пароль</label>
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={e => setPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-all"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={loginLoading || !iin || !password}
+                                    className="py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all flex items-center justify-center gap-2"
+                                >
+                                    {loginLoading
+                                        ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        : '🔐 Войти и заполнить'}
+                                </button>
+                            </form>
+                            {loginSuccess && <p className="text-emerald-400 text-xs font-bold">{loginSuccess}</p>}
+                            {loginError   && <p className="text-rose-400 text-xs font-bold">Ошибка: {loginError}</p>}
+                        </div>
+
+                        <form onSubmit={handleTriggerScraper} className="space-y-6">
+                            {/* Параметры скрапера */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="block text-[9px] font-black text-indigo-400 uppercase tracking-widest">Страниц</label>
+                                    <input
+                                        type="number" min="1" max="20"
+                                        value={scraperPages}
+                                        onChange={e => setScraperPages(e.target.value)}
+                                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm font-mono focus:outline-none focus:border-indigo-500 transition-all"
+                                    />
+                                    <p className="text-[9px] text-slate-600">≈ {scraperPages * scraperRecords} лотов</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="block text-[9px] font-black text-indigo-400 uppercase tracking-widest">Записей/стр</label>
+                                    <select
+                                        value={scraperRecords}
+                                        onChange={e => setScraperRecords(e.target.value)}
+                                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-all appearance-none"
+                                    >
+                                        {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Опциональный куки */}
+                            <div className="space-y-2">
+                                <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                                    {t('admin.cookiePayload')} <span className="text-slate-600 normal-case font-normal">(необязательно — сайт доступен без авторизации)</span>
+                                </label>
                                 <textarea
-                                    className="w-full h-40 p-6 bg-white/5 border border-white/10 rounded-[2rem] text-white font-mono text-sm placeholder:text-slate-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all leading-relaxed"
-                                    placeholder={t('admin.cookiePlaceholder')}
+                                    className="w-full h-20 p-4 bg-white/5 border border-white/10 rounded-2xl text-white font-mono text-xs placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all leading-relaxed"
+                                    placeholder="ci_session=... (необязательно)"
                                     value={cookie}
                                     onChange={(e) => setCookie(e.target.value)}
                                 />

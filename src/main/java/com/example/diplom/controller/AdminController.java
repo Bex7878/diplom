@@ -36,9 +36,21 @@ public class AdminController {
     }
 
     @PostMapping("/trigger-scraper")
-    public Map<String, Object> triggerScraper(@RequestBody(required = false) Map<String, String> body) {
-        String cookie = (body != null) ? body.get("cookie") : null;
-        return analysisService.triggerScraper(cookie);
+    public Map<String, Object> triggerScraper(@RequestBody(required = false) Map<String, Object> body) {
+        String cookie = (body != null) ? (String) body.get("cookie") : null;
+        Integer pages = (body != null && body.get("pages") instanceof Number n) ? n.intValue() : 3;
+        Integer records = (body != null && body.get("records_per_page") instanceof Number n) ? n.intValue() : 50;
+        return analysisService.triggerScraper(cookie, pages, records);
+    }
+
+    @PostMapping("/goszakup-login")
+    public Map<String, Object> goszakupLogin(@RequestBody Map<String, String> body) {
+        String iin      = body.get("iin");
+        String password = body.get("password");
+        if (iin == null || password == null) {
+            return Map.of("status", "error", "message", "iin and password required");
+        }
+        return analysisService.loginToGoszakup(iin, password);
     }
 
     @GetMapping("/users")

@@ -34,38 +34,49 @@ public class AnalysisService {
     private String pythonBaseUrl;
 
     @Transactional
-    public Map<String, Object> triggerScraper(String sessionCookie) {
-        String url = pythonBaseUrl + "/api/scrape";
+    public Map<String, Object> triggerScraper(String sessionCookie, int pages, int recordsPerPage) {
+        String url = pythonBaseUrl + "/api/scrape?pages=" + pages + "&records_per_page=" + recordsPerPage;
         if (sessionCookie != null && !sessionCookie.isBlank()) {
             try {
-                url += "?session_cookie=" + java.net.URLEncoder.encode(sessionCookie, java.nio.charset.StandardCharsets.UTF_8);
+                url += "&session_cookie=" + java.net.URLEncoder.encode(sessionCookie, java.nio.charset.StandardCharsets.UTF_8);
             } catch (Exception e) {
                 logger.error("Failed to encode session cookie: {}", e.getMessage());
-                url += "?session_cookie=" + sessionCookie;
+                url += "&session_cookie=" + sessionCookie;
             }
         }
 
+        logger.info("Triggering scraper: {}", url);
         try {
+            @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.getForObject(url, Map.class);
             if (response != null && "success".equals(response.get("status"))) {
+                @SuppressWarnings("unchecked")
                 List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
                 if (data != null) {
                     logger.info("Scraper found {} lots. Saving to database...", data.size());
+                    int saved = 0;
                     for (Map<String, Object> lot : data) {
                         try {
                             saveParsedLot(lot);
+                            saved++;
                         } catch (Exception e) {
-                            logger.error("Не удалось сохранить лот: " + lot.get("lot_id") + ". Ошибка: " + e.getMessage());
+                            logger.error("Failed to save lot {}: {}", lot.get("lot_id"), e.getMessage());
                         }
                     }
-                    return Map.of("status", "success", "count", data.size());
+                    return Map.of("status", "success", "count", saved, "total_scraped", data.size());
                 }
             }
-            return Map.of("status", "error", "message", "Scraper returned non-success status");
+            String msg = response != null ? String.valueOf(response.get("message")) : "Empty response";
+            return Map.of("status", "error", "message", msg);
         } catch (Exception e) {
-            logger.error("Error running Goszakup Scraper: {}", e.getMessage());
+            logger.error("Scraper error: {}", e.getMessage());
             return Map.of("status", "error", "message", e.getMessage());
         }
+    }
+
+    @Transactional
+    public Map<String, Object> triggerScraper(String sessionCookie) {
+        return triggerScraper(sessionCookie, 3, 50);
     }
 
     private Optional<MarketIndicator> findIndicatorByName(String name) {
@@ -322,6 +333,19 @@ public class AnalysisService {
                 isHighRisk,
                 allComparisons
         );
+    }
+
+    public Map<String, Object> loginToGoszakup(String iin, String password) {
+        String url = pythonBaseUrl + "/api/login";
+        try {
+            Map<String, String> requestBody = Map.of("iin", iin, "password", password);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restTemplate.postForObject(url, requestBody, Map.class);
+            return response != null ? response : Map.of("status", "error", "message", "Empty response from NLP service");
+        } catch (Exception e) {
+            logger.error("Goszakup login failed: {}", e.getMessage());
+            return Map.of("status", "error", "message", e.getMessage());
+        }
     }
 
     public List<Contract> getAllContracts() {
