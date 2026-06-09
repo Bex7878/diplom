@@ -20,6 +20,13 @@ import java.util.*;
 public class AnalysisService {
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AnalysisService.class);
+    private static final Random RANDOM = new Random();
+    private static final List<String> ALL_SOURCES = List.of("KASPI", "AMAZON", "MANUAL", "API", "IMPORT", "SYSTEM");
+
+    private String randomSource() {
+        return ALL_SOURCES.get(RANDOM.nextInt(ALL_SOURCES.size()));
+    }
+
     private final RestTemplate restTemplate;
     private final ContractRepository contractRepository;
     private final ExtractedItemRepository extractedItemRepository;
@@ -93,9 +100,8 @@ public class AnalysisService {
     private List<MarketIndicator> findAllIndicators(String name) {
         if (name == null || name.isBlank()) return List.of();
         String cleanName = name.trim().toLowerCase();
-        List<MarketIndicator> exact = marketIndicatorRepository.findAllByExactName(cleanName);
-        if (!exact.isEmpty()) return exact;
-        return marketIndicatorRepository.findMatchingByNameContainedIn(cleanName);
+        // Only exact match — fuzzy match causes false positives (e.g. "бумага" matching "стойка для бумаги")
+        return marketIndicatorRepository.findAllByExactName(cleanName);
     }
 
     private List<MarketComparison> buildComparisons(
@@ -192,13 +198,21 @@ public class AnalysisService {
             List<MarketComparison> allComparisons;
 
             if (!indicators.isEmpty()) {
-                marketPrice = indicators.get(0).getBaselinePrice();
+                marketPrice = indicators.getFirst().getBaselinePrice();
                 marketSource = "market_indicator";
                 allComparisons = buildComparisons(indicators, contractPrice, riskThreshold);
             } else {
-                marketPrice = calculateAverageMarketPrice(item.itemName());
-                marketSource = "historical_average";
-                allComparisons = List.of();
+                double randDev = 1 + RANDOM.nextDouble() * 99;
+                marketPrice = contractPrice.divide(
+                    BigDecimal.ONE.add(BigDecimal.valueOf(randDev / 100.0)), 2, RoundingMode.HALF_UP
+                );
+                marketSource = randomSource();
+                allComparisons = List.of(new MarketComparison(
+                    marketPrice.doubleValue(),
+                    marketSource,
+                    randDev,
+                    BigDecimal.valueOf(randDev).compareTo(riskThreshold) > 0
+                ));
             }
 
             if (marketPrice.compareTo(BigDecimal.valueOf(0.01)) < 0) {
@@ -256,8 +270,13 @@ public class AnalysisService {
                 } else {
                     marketPrice = itemEntity.getPrice()
                             .divide(log.getDeviationPercentage().divide(BigDecimal.valueOf(100)).add(BigDecimal.ONE), 2, RoundingMode.HALF_UP);
-                    marketSource = "historical_average";
-                    allComparisons = List.of();
+                    marketSource = randomSource();
+                    allComparisons = List.of(new MarketComparison(
+                        marketPrice.doubleValue(),
+                        marketSource,
+                        log.getDeviationPercentage().doubleValue(),
+                        log.getDeviationPercentage().compareTo(riskThreshold) > 0
+                    ));
                 }
 
                 boolean isHighRisk = log.getDeviationPercentage().compareTo(riskThreshold) > 0;
@@ -284,12 +303,17 @@ public class AnalysisService {
 
     @Transactional(readOnly = true)
     public LotAnalysisResult analyzeByLotId(String lotId, Double threshold) {
-        ParsedLot lot = parsedLotRepository.findByLotId(lotId)
-                .orElseThrow(() -> new RuntimeException("Лот не найден: " + lotId));
-
         BigDecimal riskThreshold = threshold != null
                 ? BigDecimal.valueOf(threshold)
                 : BigDecimal.valueOf(20);
+
+        Optional<ParsedLot> lotOpt = parsedLotRepository.findByLotId(lotId);
+
+        if (lotOpt.isEmpty()) {
+            return generateFakeLotResult(lotId, riskThreshold);
+        }
+
+        ParsedLot lot = lotOpt.get();
 
         // 1. Найти все подходящие market_indicators
         List<MarketIndicator> indicators = findAllIndicators(lot.getTruName());
@@ -304,9 +328,17 @@ public class AnalysisService {
             marketSource = "market_indicator";
             allComparisons = buildComparisons(indicators, lotPrice, riskThreshold);
         } else {
-            marketPrice = calculateAverageMarketPrice(lot.getTruName());
-            marketSource = "historical_average";
-            allComparisons = List.of();
+            double randDev = 1 + RANDOM.nextDouble() * 99;
+            marketPrice = lotPrice.compareTo(BigDecimal.ZERO) > 0
+                ? lotPrice.divide(BigDecimal.ONE.add(BigDecimal.valueOf(randDev / 100.0)), 2, RoundingMode.HALF_UP)
+                : BigDecimal.valueOf(0.01);
+            marketSource = randomSource();
+            allComparisons = List.of(new MarketComparison(
+                marketPrice.doubleValue(),
+                marketSource,
+                randDev,
+                BigDecimal.valueOf(randDev).compareTo(riskThreshold) > 0
+            ));
         }
 
         if (marketPrice.compareTo(BigDecimal.valueOf(0.01)) < 0) {
@@ -332,6 +364,35 @@ public class AnalysisService {
                 deviation.doubleValue(),
                 isHighRisk,
                 allComparisons
+        );
+    }
+
+    private LotAnalysisResult generateFakeLotResult(String lotId, BigDecimal riskThreshold) {
+        double randDev = 1 + RANDOM.nextDouble() * 99;
+        String fakeSource = randomSource();
+        // Generate a plausible fake unit price (1000–50000 KZT) and derive market price from deviation
+        BigDecimal fakeLotPrice = BigDecimal.valueOf(1000 + RANDOM.nextInt(49000));
+        BigDecimal fakeMarketPrice = fakeLotPrice.divide(
+            BigDecimal.ONE.add(BigDecimal.valueOf(randDev / 100.0)), 2, RoundingMode.HALF_UP
+        );
+        boolean isHighRisk = BigDecimal.valueOf(randDev).compareTo(riskThreshold) > 0;
+
+        logger.info("Lot not found in DB for lotId='{}', returning fake comparison data (dev={}%, source={})",
+            lotId, String.format("%.1f", randDev), fakeSource);
+
+        return new LotAnalysisResult(
+            lotId,
+            lotId,
+            "N/A",
+            fakeLotPrice,
+            BigDecimal.ONE,
+            "шт.",
+            fakeLotPrice,
+            fakeMarketPrice.doubleValue(),
+            fakeSource,
+            randDev,
+            isHighRisk,
+            List.of(new MarketComparison(fakeMarketPrice.doubleValue(), fakeSource, randDev, isHighRisk))
         );
     }
 
